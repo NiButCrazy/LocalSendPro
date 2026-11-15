@@ -54,20 +54,40 @@ class TransferProgressWindow {
   static bool get isSupported => defaultTargetPlatform == TargetPlatform.windows;
 
   static void Function(String action)? _actionHandler;
+  static void Function(List<String> args)? _secondInstanceHandler;
 
   /// Registers the handler for the native window actions (`accept`, `decline`, `open`, `hide`).
   static void setActionHandler(void Function(String action)? handler) {
     _actionHandler = handler;
-    _channel.setMethodCallHandler(handler == null ? null : _handleMethodCall);
+    _syncMethodCallHandler();
+  }
+
+  /// Registers the handler for a second launch forwarded by the Windows runner.
+  ///
+  /// This covers double-clicking the exe and picking LocalSend in the Windows
+  /// Share menu while an instance is already running: the native runner hands
+  /// the command line over without starting a second Flutter engine.
+  static void setSecondInstanceHandler(void Function(List<String> args)? handler) {
+    _secondInstanceHandler = handler;
+    _syncMethodCallHandler();
+  }
+
+  static void _syncMethodCallHandler() {
+    final hasHandler = _actionHandler != null || _secondInstanceHandler != null;
+    _channel.setMethodCallHandler(hasHandler ? _handleMethodCall : null);
   }
 
   static Future<dynamic> _handleMethodCall(MethodCall call) async {
-    if (call.method != 'onWindowAction') {
-      return null;
-    }
-    final arguments = call.arguments;
-    if (arguments is Map && arguments['action'] is String) {
-      _actionHandler?.call(arguments['action'] as String);
+    if (call.method == 'onWindowAction') {
+      final arguments = call.arguments;
+      if (arguments is Map && arguments['action'] is String) {
+        _actionHandler?.call(arguments['action'] as String);
+      }
+    } else if (call.method == 'onSecondInstance') {
+      final arguments = call.arguments;
+      if (arguments is List) {
+        _secondInstanceHandler?.call(arguments.whereType<String>().toList(growable: false));
+      }
     }
     return null;
   }

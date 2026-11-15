@@ -6,8 +6,10 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "single_instance.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -197,6 +199,41 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_COPYDATA) {
+    // A second launch forwarded its command line instead of starting a second
+    // engine. Refuse the hand-over while the channel is not available yet, so
+    // the sender can fall back to the regular startup path.
+    auto* copy_data = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
+    if (copy_data == nullptr ||
+        copy_data->dwData != kSingleInstanceCopyDataMagic ||
+        !transfer_progress_channel_) {
+      return FALSE;
+    }
+
+    std::vector<std::string> args;
+    const char* bytes = static_cast<const char*>(copy_data->lpData);
+    size_t offset = 0;
+    while (offset < copy_data->cbData) {
+      size_t end = offset;
+      while (end < copy_data->cbData && bytes[end] != '\0') {
+        ++end;
+      }
+      if (end > offset) {
+        args.emplace_back(bytes + offset, end - offset);
+      }
+      offset = end + 1;
+    }
+
+    flutter::EncodableList arguments;
+    for (const auto& arg : args) {
+      arguments.emplace_back(arg);
+    }
+    transfer_progress_channel_->InvokeMethod(
+        "onSecondInstance",
+        std::make_unique<flutter::EncodableValue>(arguments));
+    return TRUE;
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
