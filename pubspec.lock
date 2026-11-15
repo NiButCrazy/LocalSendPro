@@ -1724,14 +1724,6 @@ packages:
       url: "https://pub-web.flutter-io.cn"
     source: hosted
     version: "2.1.6"
-  tray_manager:
-    dependency: transitive
-    description:
-      name: tray_manager
-      sha256: "1a659b08baa6e9b91ef8ce16eda37740de398be1c4cf322b8a1ddfef25c68c5a"
-      url: "https://pub-web.flutter-io.cn"
-    source: hosted
-    version: "0.5.3"
   type_plus:
     dependency: transitive
     description:

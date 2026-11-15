@@ -7,4 +7,5 @@ environment:
 workspace:
   - app
   - packages/localsend_isolates
+  - packages/tray_manager
   - packages/typed_isolates
