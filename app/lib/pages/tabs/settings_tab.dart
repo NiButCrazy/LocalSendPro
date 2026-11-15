@@ -34,6 +34,9 @@ import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/// Local enhanced build number, shown as `<upstream version>-Pro <x.x.x>`.
+const _proVersion = '1.0.0';
+
 class SettingsTab extends StatelessWidget {
   const SettingsTab();
 
@@ -606,13 +609,13 @@ class SettingsTab extends StatelessWidget {
                 .watch(versionProvider)
                 .maybeWhen(
                   data: (version) => Text(
-                    'Version: ${version.combinedString}',
+                    '${version.version}-Pro $_proVersion',
                     textAlign: TextAlign.center,
                   ),
                   orElse: () => Container(),
                 ),
             Text(
-              '© ${DateTime.now().year} Tien Do Nam',
+              '© ${DateTime.now().year} NiButCrazy',
               textAlign: TextAlign.center,
             ),
             Center(

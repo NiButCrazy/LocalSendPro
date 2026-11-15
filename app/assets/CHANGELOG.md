@@ -1,3 +1,15 @@
+## 1.18.2-Pro 1.0.0 (2026-11-15)
+
+本地增强版内容（基于 LocalSend 1.18.2）：
+
+- feat: 轻量后台模式：关闭窗口驻留托盘，暂停界面渲染并回收闲置内存
+- feat: 无边框窗口：隐藏系统标题栏，应用内拖动条与窗口按钮，内容区顶部圆角
+- feat(Windows): 文件传输进度小窗：支持接收/拒绝、隐藏按钮、进度、文件计数、速度与剩余时间
+- feat(Android): 前台服务通知新增系统进度条
+- style: 扁平化卡片、按钮和开关样式，统一 12px 圆角
+- fix(Windows): 托盘右键菜单失去焦点后不关闭
+- i18n: 补充中文翻译并重命名校验和相关设置项
+
 ## Unreleased
 
 - fix(linux): tray icon fails to load in Snap installations (@vicajilau)
