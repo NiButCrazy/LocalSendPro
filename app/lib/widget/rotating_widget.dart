@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:localsend_isolates/util/sleep.dart';
 
 class RotatingWidget extends StatefulWidget {
   final Duration duration;
@@ -19,20 +20,57 @@ class RotatingWidget extends StatefulWidget {
   State<RotatingWidget> createState() => RotatingWidgetState();
 }
 
-class RotatingWidgetState extends State<RotatingWidget> {
+class RotatingWidgetState extends State<RotatingWidget> with WidgetsBindingObserver {
   static const _fps = 30;
   static const _tickDuration = 1000 ~/ _fps; // in milliseconds
   static const _maxRadians = 6.28; // 360 degrees in radians
   double _angle = 0; // in radians
   double _anglePerTick = 0;
+  Timer? _timer;
+  bool _tickerEnabled = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addObserver(this);
+    _updateAnglePerTick();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // TickerMode is disabled while the app is hidden in the tray (see _TickerModeWatcher in main.dart).
+    // Reading it here registers a dependency, so this method runs again when the mode changes.
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant RotatingWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.duration != widget.duration || oldWidget.reverse != widget.reverse) {
       _updateAnglePerTick();
-      _loop();
-    });
+    }
+    if (oldWidget.spinning != widget.spinning) {
+      _syncTimer();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        // Frames are not scheduled while the window is hidden, so the TickerMode change might not
+        // reach this widget in time. Stop the timer immediately instead of keeping it at 30 fps.
+        _cancelTimer();
+        break;
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.inactive:
+        _syncTimer();
+        break;
+    }
   }
 
   void _updateAnglePerTick() {
@@ -42,20 +80,28 @@ class RotatingWidgetState extends State<RotatingWidget> {
     }
   }
 
-  /// This loop has a much greater performance than using [AnimationController].
-  void _loop() async {
-    while (true) {
-      await sleepAsync(_tickDuration);
-      if (!mounted) {
-        return;
-      }
-      if (!widget.spinning) {
-        continue;
-      }
+  void _syncTimer() {
+    if (!mounted || !widget.spinning || !_tickerEnabled) {
+      _cancelTimer();
+      return;
+    }
+    _timer ??= Timer.periodic(const Duration(milliseconds: _tickDuration), (_) {
       setState(() {
         _angle = (_angle + _anglePerTick) % _maxRadians;
       });
-    }
+    });
+  }
+
+  void _cancelTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  @override
+  void dispose() {
+    _cancelTimer();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

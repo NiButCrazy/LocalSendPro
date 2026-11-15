@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,7 @@ import 'package:localsend_app/gen/assets.gen.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
+import 'package:localsend_app/util/native/working_set_helper.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:refena_flutter/refena_flutter.dart';
@@ -82,6 +84,8 @@ Future<void> hideToTray() async {
   } catch (e) {
     _logger.warning('Failed to update sleep state (Refena not yet initialized)', e);
   }
+
+  _startWorkingSetTrim();
 }
 
 Future<void> showFromTray() async {
@@ -99,6 +103,29 @@ Future<void> showFromTray() async {
   } catch (e) {
     _logger.warning('Failed to update sleep state (Refena not yet initialized)', e);
   }
+
+  _stopWorkingSetTrim();
+}
+
+Timer? _workingSetTrimTimer;
+
+/// Returns idle pages to the OS after the window has settled and keeps doing so every minute,
+/// because background network activity (multicast announcements, incoming requests) pages
+/// some memory back into the working set over time.
+void _startWorkingSetTrim() {
+  if (!checkPlatform([TargetPlatform.windows])) {
+    return;
+  }
+  _stopWorkingSetTrim();
+  _workingSetTrimTimer = Timer(const Duration(seconds: 2), () {
+    trimWorkingSet();
+    _workingSetTrimTimer = Timer.periodic(const Duration(minutes: 1), (_) => trimWorkingSet());
+  });
+}
+
+void _stopWorkingSetTrim() {
+  _workingSetTrimTimer?.cancel();
+  _workingSetTrimTimer = null;
 }
 
 Future<void> destroyTray() async {

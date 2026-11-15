@@ -8,6 +8,8 @@ void main() {
       // The following test will fail if the i18n file is either not compiled
       // or there are compile-time errors.
       expect(AppLocale.en.translations.general.accept, 'Accept');
+      expect(AppLocale.en.translations.settingsTab.general.backgroundMode, isNotEmpty);
+      expect(AppLocale.en.translations.settingsTab.general.backgroundModeDescription, isNotEmpty);
     });
 
     test('All locales should be supported by Flutter', () {

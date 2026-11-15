@@ -3,6 +3,7 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'dart:async' as _i5;
 import 'dart:ui' as _i3;
 
@@ -11,7 +12,8 @@ import 'package:localsend_app/gen/strings.g.dart' as _i11;
 import 'package:localsend_app/model/persistence/color_mode.dart' as _i10;
 import 'package:localsend_app/model/persistence/favorite_device.dart' as _i7;
 import 'package:localsend_app/model/persistence/quick_save_mode.dart' as _i12;
-import 'package:localsend_app/model/persistence/receive_history_entry.dart' as _i6;
+import 'package:localsend_app/model/persistence/receive_history_entry.dart'
+    as _i6;
 import 'package:localsend_app/model/send_mode.dart' as _i13;
 import 'package:localsend_app/provider/persistence_provider.dart' as _i4;
 import 'package:localsend_isolates/model/device.dart' as _i14;
@@ -35,18 +37,22 @@ import 'package:shared_preferences/shared_preferences.dart' as _i15;
 // ignore_for_file: subtype_of_sealed_class
 // ignore_for_file: invalid_use_of_internal_member
 
-class _FakeStoredSecurityContext_0 extends _i1.SmartFake implements _i2.StoredSecurityContext {
-  _FakeStoredSecurityContext_0(Object parent, Invocation parentInvocation) : super(parent, parentInvocation);
+class _FakeStoredSecurityContext_0 extends _i1.SmartFake
+    implements _i2.StoredSecurityContext {
+  _FakeStoredSecurityContext_0(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
 }
 
 class _FakeColor_1 extends _i1.SmartFake implements _i3.Color {
-  _FakeColor_1(Object parent, Invocation parentInvocation) : super(parent, parentInvocation);
+  _FakeColor_1(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
 }
 
 /// A class which mocks [PersistenceService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockPersistenceService extends _i1.Mock implements _i4.PersistenceService {
+class MockPersistenceService extends _i1.Mock
+    implements _i4.PersistenceService {
   @override
   bool get isFirstAppStart =>
       (super.noSuchMethod(
@@ -534,6 +540,24 @@ class MockPersistenceService extends _i1.Mock implements _i4.PersistenceService 
           as _i5.Future<void>);
 
   @override
+  bool isBackgroundMode() =>
+      (super.noSuchMethod(
+            Invocation.method(#isBackgroundMode, []),
+            returnValue: false,
+            returnValueForMissingStub: false,
+          )
+          as bool);
+
+  @override
+  _i5.Future<void> setBackgroundMode(bool? backgroundMode) =>
+      (super.noSuchMethod(
+            Invocation.method(#setBackgroundMode, [backgroundMode]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   bool isHttps() =>
       (super.noSuchMethod(
             Invocation.method(#isHttps, []),
@@ -618,6 +642,24 @@ class MockPersistenceService extends _i1.Mock implements _i4.PersistenceService 
   bool getSaveWindowPlacement() =>
       (super.noSuchMethod(
             Invocation.method(#getSaveWindowPlacement, []),
+            returnValue: false,
+            returnValueForMissingStub: false,
+          )
+          as bool);
+
+  @override
+  _i5.Future<void> setAlwaysOnTop(bool? alwaysOnTop) =>
+      (super.noSuchMethod(
+            Invocation.method(#setAlwaysOnTop, [alwaysOnTop]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  bool getAlwaysOnTop() =>
+      (super.noSuchMethod(
+            Invocation.method(#getAlwaysOnTop, []),
             returnValue: false,
             returnValueForMissingStub: false,
           )

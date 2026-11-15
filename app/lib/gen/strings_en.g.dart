@@ -1091,6 +1091,13 @@ class Translations$settingsTab$general$en {
   /// en: 'Minimize to the System Tray/Menu Bar when closing'
   String get minimizeToTray => 'Minimize to the System Tray/Menu Bar when closing';
 
+  /// en: 'Lightweight background mode'
+  String get backgroundMode => 'Lightweight background mode';
+
+  /// en: 'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused.'
+  String get backgroundModeDescription =>
+      'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused.';
+
   /// en: 'Autostart after login'
   String get launchAtStartup => 'Autostart after login';
 

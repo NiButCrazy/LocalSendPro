@@ -118,6 +118,14 @@ class SettingsTab extends StatelessWidget {
                         await ref.notifier(settingsProvider).setMinimizeToTray(b);
                       },
                     ),
+                    _BooleanEntry(
+                      label: t.settingsTab.general.backgroundMode,
+                      description: t.settingsTab.general.backgroundModeDescription,
+                      value: vm.settings.backgroundMode,
+                      onChanged: (b) async {
+                        await ref.notifier(settingsProvider).setBackgroundMode(b);
+                      },
+                    ),
                   ],
                   if (checkPlatformIsDesktop()) ...[
                     _BooleanEntry(

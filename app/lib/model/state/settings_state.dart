@@ -27,6 +27,7 @@ class SettingsState with SettingsStateMappable {
   final String? receivePin; // null = disabled
   final bool autoFinish; // automatically finish sessions
   final bool minimizeToTray; // minimize to tray instead of exiting the app
+  final bool backgroundMode; // keep running in the tray and pause UI rendering while hidden
   final bool https;
   final SendMode sendMode;
   final bool saveWindowPlacement;
@@ -60,6 +61,7 @@ class SettingsState with SettingsStateMappable {
     required this.receivePin,
     required this.autoFinish,
     required this.minimizeToTray,
+    required this.backgroundMode,
     required this.https,
     required this.sendMode,
     required this.saveWindowPlacement,
