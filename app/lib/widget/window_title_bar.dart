@@ -5,6 +5,7 @@ import 'package:localsend_app/config/theme.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/widget/responsive_builder.dart';
+import 'package:localsend_isolates/util/transfer_progress_window.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:window_manager/window_manager.dart';
@@ -22,6 +23,15 @@ class WindowTitleBarWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final framelessWindow = context.ref.watch(settingsProvider.select((settings) => settings.framelessWindow));
+
+    final theme = Theme.of(context);
+    TransferProgressWindow.setTheme(
+      dark: theme.brightness == Brightness.dark,
+      background: theme.colorScheme.surfaceContainerHigh.toARGB32(),
+      foreground: theme.colorScheme.onSurface.toARGB32(),
+      accent: theme.colorScheme.primary.toARGB32(),
+    );
+
     return WindowTitleBarArea(
       framelessWindow: framelessWindow,
       child: child,

@@ -9,6 +9,7 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "main.cpp"
+  "transfer_progress_window.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "winrt_ext.cpp"
@@ -40,6 +41,8 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+# GDI painting and the registry read for the system theme.
+target_link_libraries(${BINARY_NAME} PRIVATE "gdi32.lib" "advapi32.lib")
 # C++/WinRT (winrt_ext.cpp): newer Windows SDKs require linking the WinRT
 # activation functions (RoGetActivationFactory etc.) explicitly.
 target_link_libraries(${BINARY_NAME} PRIVATE "runtimeobject.lib")

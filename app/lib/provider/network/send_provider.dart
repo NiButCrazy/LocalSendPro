@@ -469,10 +469,17 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     final transferNotifier = ref.read(fileTransferProvider);
     int currentBytes = 0;
     int totalBytes = 0;
+    int finishedFiles = 0;
+    int totalFiles = 0;
     for (final sendingFile in session.files.values) {
-      if (transferNotifier.getStatus(sessionId: sessionId, fileId: sendingFile.file.id) == FileStatus.skipped) {
+      final status = transferNotifier.getStatus(sessionId: sessionId, fileId: sendingFile.file.id);
+      if (status == FileStatus.skipped) {
         // not accepted by the receiver
         continue;
+      }
+      totalFiles++;
+      if (status == FileStatus.finished) {
+        finishedFiles++;
       }
       final size = sendingFile.file.size;
       totalBytes += size;
@@ -483,6 +490,8 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
       sessionId: sessionId,
       currentBytes: currentBytes,
       totalBytes: totalBytes,
+      finishedFiles: finishedFiles,
+      totalFiles: totalFiles,
       startTime: session.startTime,
       endTime: session.endTime,
     );

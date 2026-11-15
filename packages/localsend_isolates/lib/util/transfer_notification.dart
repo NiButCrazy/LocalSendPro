@@ -2,6 +2,7 @@ import 'package:localsend_isolates/util/file_size_helper.dart';
 import 'package:localsend_isolates/util/file_speed_helper.dart';
 import 'package:localsend_isolates/util/foreground_service.dart';
 import 'package:localsend_isolates/util/notification_strings.dart';
+import 'package:localsend_isolates/util/transfer_progress_window.dart';
 
 /// A transfer only becomes fast enough to measure after a while; the first chunks are not
 /// representative. Same threshold as `ProgressPage`.
@@ -25,13 +26,18 @@ class TransferNotification {
     _strings = strings;
   }
 
+  /// Only for tests: forgets every registered transfer.
+  static void resetForTest() {
+    _transfers.clear();
+  }
+
   /// Whether [update] would reach the notification, so that callers can skip summing up the
   /// progress of every file for an update that gets throttled away.
   ///
   /// While several transfers run, they take turns passing this check, which means each of them
   /// refreshes its share of the total a bit less often. The numbers stay close enough: every
   /// running transfer reports progress continuously.
-  static bool get shouldUpdate => ForegroundService.shouldUpdateNotification;
+  static bool get shouldUpdate => ForegroundService.shouldUpdateNotification || TransferProgressWindow.shouldUpdate;
 
   /// Registers a transfer, starting the service if it is the first one.
   ///
@@ -46,11 +52,14 @@ class TransferNotification {
     _transfers[sessionId] = _Transfer(receiving: receiving);
 
     if (isFirst) {
+      final snapshot = _snapshot();
       ForegroundService.start(
         channelName: _requiredStrings.titleReceiving,
-        title: _title(),
-        text: _text(),
+        title: snapshot.title,
+        text: snapshot.text,
+        progress: snapshot.percentage,
       );
+      TransferProgressWindow.show(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
     }
   }
 
@@ -60,6 +69,8 @@ class TransferNotification {
     required String sessionId,
     required int currentBytes,
     required int totalBytes,
+    required int finishedFiles,
+    required int totalFiles,
     required int? startTime,
     required int? endTime,
   }) {
@@ -70,9 +81,13 @@ class TransferNotification {
 
     transfer.currentBytes = currentBytes;
     transfer.totalBytes = totalBytes;
+    transfer.finishedFiles = finishedFiles;
+    transfer.totalFiles = totalFiles;
     transfer.speedInBytes = _speed(currentBytes: currentBytes, startTime: startTime, endTime: endTime);
 
-    ForegroundService.updateNotification(title: _title(), text: _text());
+    final snapshot = _snapshot();
+    ForegroundService.updateNotification(title: snapshot.title, text: snapshot.text, progress: snapshot.percentage);
+    TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
   }
 
   /// Unregisters a transfer, stopping the service once the last one is gone.
@@ -83,8 +98,11 @@ class TransferNotification {
 
     if (_transfers.isEmpty) {
       ForegroundService.stop();
+      TransferProgressWindow.hide();
     } else {
-      ForegroundService.updateNotification(title: _title(), text: _text());
+      final snapshot = _snapshot();
+      ForegroundService.updateNotification(title: snapshot.title, text: snapshot.text, progress: snapshot.percentage);
+      TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
     }
   }
 
@@ -125,13 +143,17 @@ class TransferNotification {
   /// The combined progress of all running transfers:
   /// 42% (1.2 MB / 3.4 MB)
   /// 0:45 · 1.2 MB/s
-  static String _text() {
+  static ({String title, String windowTitle, String text, String windowText, int percentage}) _snapshot() {
     int currentBytes = 0;
     int totalBytes = 0;
+    int finishedFiles = 0;
+    int totalFiles = 0;
     int? speedInBytes;
     for (final transfer in _transfers.values) {
       currentBytes += transfer.currentBytes;
       totalBytes += transfer.totalBytes;
+      finishedFiles += transfer.finishedFiles;
+      totalFiles += transfer.totalFiles;
       final speed = transfer.speedInBytes;
       if (speed != null) {
         speedInBytes = (speedInBytes ?? 0) + speed;
@@ -139,14 +161,27 @@ class TransferNotification {
     }
 
     final percentage = totalBytes == 0 ? 0 : (100 * currentBytes / totalBytes).floor();
-    final text = StringBuffer('$percentage% (${currentBytes.asReadableFileSize} / ${totalBytes.asReadableFileSize})');
+    final readableCurrent = currentBytes.asReadableFileSize;
+    final readableTotal = totalBytes.asReadableFileSize;
+    // Show the file currently being worked on (1-based), not the number already finished.
+    final currentFile = finishedFiles < totalFiles ? finishedFiles + 1 : finishedFiles;
+    final filesCount = totalFiles > 1 ? '$currentFile/$totalFiles' : null;
+    final title = _title();
+    final text = StringBuffer('$percentage% ($readableCurrent / $readableTotal)');
+    // The Windows window draws the part after the tab on the right edge. A control
+    // character in the title starts a muted, smaller file counter.
+    final windowTitle = filesCount != null ? '$title\u0001$filesCount' : title;
+    final windowText = StringBuffer('$percentage%\t$readableCurrent / $readableTotal');
 
     if (speedInBytes != null) {
-      text.write('\n${getRemainingTime(bytesPerSeconds: speedInBytes, remainingBytes: totalBytes - currentBytes, strings: _requiredStrings)}');
-      text.write(' · ${speedInBytes.asReadableFileSize}/s');
+      final remaining = getRemainingTime(bytesPerSeconds: speedInBytes, remainingBytes: totalBytes - currentBytes, strings: _requiredStrings);
+      text.write('\n$remaining · ${speedInBytes.asReadableFileSize}/s');
+      windowText.write('\n$remaining\t${speedInBytes.asReadableFileSize}/s');
+    } else if (filesCount != null) {
+      text.write('\n$filesCount');
     }
 
-    return text.toString();
+    return (title: title, windowTitle: windowTitle, text: text.toString(), windowText: windowText.toString(), percentage: percentage);
   }
 }
 
@@ -154,6 +189,8 @@ class _Transfer {
   final bool receiving;
   int currentBytes = 0;
   int totalBytes = 0;
+  int finishedFiles = 0;
+  int totalFiles = 0;
   int? speedInBytes;
 
   _Transfer({required this.receiving});

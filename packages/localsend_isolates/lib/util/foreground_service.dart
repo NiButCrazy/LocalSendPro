@@ -26,6 +26,8 @@ class ForegroundService {
   static DateTime? _lastUpdate;
   static String? _lastTitle;
   static String? _lastText;
+  static int? _lastProgress;
+  static int? _lastMaxProgress;
 
   /// The service exists on Android only. On iOS the app keeps running in the background anyway,
   /// and on desktop there is nothing to keep alive.
@@ -52,6 +54,8 @@ class ForegroundService {
     required String channelName,
     required String title,
     required String text,
+    int progress = 0,
+    int maxProgress = 100,
   }) {
     if (!_isSupported) {
       return;
@@ -60,6 +64,8 @@ class ForegroundService {
     _lastUpdate = null;
     _lastTitle = null;
     _lastText = null;
+    _lastProgress = null;
+    _lastMaxProgress = null;
     _queue.add(() async {
       if (_running) {
         return;
@@ -73,6 +79,8 @@ class ForegroundService {
         serviceTypes: const [ForegroundServiceTypes.dataSync],
         notificationTitle: title,
         notificationText: text,
+        notificationProgress: progress,
+        notificationProgressMax: maxProgress,
       );
 
       if (result is ServiceRequestFailure) {
@@ -91,7 +99,12 @@ class ForegroundService {
   ///
   /// The [title] can change while the service runs, because what the service is keeping alive
   /// may change without it ever stopping.
-  static void updateNotification({required String title, required String text}) {
+  static void updateNotification({
+    required String title,
+    required String text,
+    required int progress,
+    int maxProgress = 100,
+  }) {
     if (!_isSupported) {
       return;
     }
@@ -103,18 +116,25 @@ class ForegroundService {
     }
     _lastUpdate = now;
 
-    if (title == _lastTitle && text == _lastText) {
+    if (title == _lastTitle && text == _lastText && progress == _lastProgress && maxProgress == _lastMaxProgress) {
       return;
     }
     _lastTitle = title;
     _lastText = text;
+    _lastProgress = progress;
+    _lastMaxProgress = maxProgress;
 
     _queue.add(() async {
       if (!_running) {
         return;
       }
 
-      final result = await FlutterForegroundTask.updateService(notificationTitle: title, notificationText: text);
+      final result = await FlutterForegroundTask.updateService(
+        notificationTitle: title,
+        notificationText: text,
+        notificationProgress: progress,
+        notificationProgressMax: maxProgress,
+      );
       if (result is ServiceRequestFailure) {
         _logger.warning('Could not update the foreground service', result.error);
       }
@@ -130,6 +150,8 @@ class ForegroundService {
     _lastUpdate = null;
     _lastTitle = null;
     _lastText = null;
+    _lastProgress = null;
+    _lastMaxProgress = null;
     _queue.add(() async {
       if (!_running) {
         return;

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/state/server/receive_session_state.dart';
 import 'package:localsend_app/model/state/server/receiving_file.dart';
 import 'package:localsend_app/pages/home_page.dart';
@@ -34,6 +35,7 @@ import 'package:localsend_isolates/model/session_status.dart';
 import 'package:localsend_isolates/rust/api/server.dart' show SessionEndReasonV2;
 import 'package:localsend_isolates/util/rust.dart';
 import 'package:localsend_isolates/util/transfer_notification.dart';
+import 'package:localsend_isolates/util/transfer_progress_window.dart';
 import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -42,6 +44,21 @@ import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
 
 final _logger = Logger('ReceiveController');
+
+/// The waiting session currently shown in the Windows request window, if any.
+String? _waitingSessionId;
+
+void _clearWaitingSession() {
+  _waitingSessionId = null;
+}
+
+void _hideWaitingWindow() {
+  if (_waitingSessionId == null) {
+    return;
+  }
+  _waitingSessionId = null;
+  TransferProgressWindow.hide();
+}
 
 /// Handles all server events for receiving files.
 /// The HTTP requests themselves are served by the Rust server which emits
@@ -157,7 +174,18 @@ class ReceiveController {
       return;
     }
 
-    if (checkPlatformHasTray() && (await windowManager.isMinimized() || !(await windowManager.isVisible()) || !(await windowManager.isFocused()))) {
+    final backgroundHidden = checkPlatform([TargetPlatform.windows]) && (!(await windowManager.isVisible()) || await windowManager.isMinimized());
+    if (backgroundHidden) {
+      _waitingSessionId = sessionId;
+      TransferProgressWindow.setActionHandler(_onRequestWindowAction);
+      TransferProgressWindow.showWaiting(
+        title: server.getState().session?.senderAlias ?? event.info.alias,
+        text: t.receivePage.subTitle(n: files.length),
+        acceptLabel: t.general.accept,
+        declineLabel: t.general.decline,
+      );
+    } else if (checkPlatformHasTray() &&
+        (await windowManager.isMinimized() || !(await windowManager.isVisible()) || !(await windowManager.isFocused()))) {
       await showFromTray();
     }
 
@@ -299,10 +327,16 @@ class ReceiveController {
     final transferNotifier = server.ref.read(fileTransferProvider);
     int currentBytes = 0;
     int totalBytes = 0;
+    int finishedFiles = 0;
+    int totalFiles = 0;
     for (final receivingFile in session.files.values) {
       if (receivingFile.desiredName == null) {
         // not accepted by the user
         continue;
+      }
+      totalFiles++;
+      if (transferNotifier.getStatus(sessionId: session.sessionId, fileId: receivingFile.file.id) == FileStatus.finished) {
+        finishedFiles++;
       }
       final size = receivingFile.file.size;
       totalBytes += size;
@@ -313,6 +347,8 @@ class ReceiveController {
       sessionId: session.sessionId,
       currentBytes: currentBytes,
       totalBytes: totalBytes,
+      finishedFiles: finishedFiles,
+      totalFiles: totalFiles,
       startTime: session.startTime,
       endTime: session.endTime,
     );
@@ -522,6 +558,56 @@ class ReceiveController {
     });
   }
 
+  /// Handles an action from the Windows transfer request window.
+  void _onRequestWindowAction(String action) {
+    switch (action) {
+      case 'accept':
+        {
+          final session = server.getStateOrNull()?.session;
+          if (session == null || session.status != SessionStatus.waiting || _waitingSessionId != session.sessionId) {
+            return;
+          }
+          final sessionId = session.sessionId;
+          // Switch the (possibly hidden) UI to the progress page, like ReceivePage.onAccept does.
+          unawaited(
+            Routerino.context.pushAndRemoveUntilImmediately(
+              removeUntil: ReceivePage,
+              builder: () => ProgressPage(
+                showAppBar: false,
+                closeSessionOnClose: true,
+                sessionId: sessionId,
+              ),
+            ),
+          );
+          unawaited(
+            server.ref.notifier(serverProvider).acceptFileRequest({
+              for (final file in session.files.values) file.file.id: file.file.fileName,
+            }),
+          );
+          return;
+        }
+      case 'decline':
+        {
+          final session = server.getStateOrNull()?.session;
+          if (session != null && session.status == SessionStatus.waiting) {
+            server.ref.notifier(serverProvider).declineFileRequest();
+          }
+          _hideWaitingWindow();
+          // ReceivePage is already in the hidden navigator; pop it back to the home page.
+          Routerino.context.popUntilRoot();
+          return;
+        }
+      case 'open':
+        unawaited(showFromTray());
+        return;
+      case 'hide':
+        TransferProgressWindow.hide();
+        return;
+      default:
+        return;
+    }
+  }
+
   /// Accepts the file request with the given [fileNameMap] (file id -> desired file name).
   Future<void> acceptFileRequest(Map<String, String> fileNameMap) async {
     final session = server.getStateOrNull()?.session;
@@ -536,6 +622,9 @@ class ReceiveController {
       closeSession();
       return;
     }
+
+    // Keep the request window visible: the progress notification reuses the same window.
+    _clearWaitingSession();
 
     server.setState(
       (oldState) {
@@ -681,6 +770,8 @@ class ReceiveController {
   }
 
   void closeSession() {
+    _hideWaitingWindow();
+
     final sessionId = server.getStateOrNull()?.session?.sessionId;
     if (sessionId == null) {
       return;
@@ -698,6 +789,8 @@ class ReceiveController {
 }
 
 void _cancelBySender(ServerUtils server) {
+  _hideWaitingWindow();
+
   final receiveSession = server.getStateOrNull()?.session;
   if (receiveSession == null) {
     return;
