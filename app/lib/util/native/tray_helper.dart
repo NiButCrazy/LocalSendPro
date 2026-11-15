@@ -70,7 +70,7 @@ Future<void> initTray() async {
   }
 }
 
-Future<void> hideToTray() async {
+Future<void> hideToTray({bool trimWorkingSet = false}) async {
   await windowManager.hide();
   if (checkPlatform([TargetPlatform.macOS])) {
     // This will crash on Windows
@@ -85,7 +85,10 @@ Future<void> hideToTray() async {
     _logger.warning('Failed to update sleep state (Refena not yet initialized)', e);
   }
 
-  _startWorkingSetTrim();
+  if (trimWorkingSet) {
+    // Only the lightweight background mode returns idle pages to the OS.
+    _startWorkingSetTrim();
+  }
 }
 
 Future<void> showFromTray() async {

@@ -143,7 +143,7 @@ Future<RefenaContainer> preInit(List<String> args) async {
     }
 
     if (startHidden) {
-      unawaited(hideToTray());
+      unawaited(hideToTray(trimWorkingSet: persistenceService.isBackgroundMode()));
     } else {
       unawaited(showFromTray());
     }

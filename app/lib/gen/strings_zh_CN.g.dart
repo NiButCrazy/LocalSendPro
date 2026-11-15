@@ -960,7 +960,7 @@ class Translations$settingsTab$general$zh_CN extends Translations$settingsTab$ge
   @override
   String get backgroundMode => '轻量后台模式';
   @override
-  String get backgroundModeDescription => '关闭窗口后驻留系统托盘，继续设备发现与文件接收，同时暂停界面渲染。';
+  String get backgroundModeDescription => '关闭窗口后驻留系统托盘，继续设备发现与文件接收，同时暂停界面渲染并回收闲置内存。';
   @override
   String get launchAtStartup => '登录系统后自动启动程序';
   @override

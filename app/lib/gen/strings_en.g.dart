@@ -1097,9 +1097,9 @@ class Translations$settingsTab$general$en {
   /// en: 'Lightweight background mode'
   String get backgroundMode => 'Lightweight background mode';
 
-  /// en: 'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused.'
+  /// en: 'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused and idle memory is returned to the system.'
   String get backgroundModeDescription =>
-      'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused.';
+      'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused and idle memory is returned to the system.';
 
   /// en: 'Autostart after login'
   String get launchAtStartup => 'Autostart after login';

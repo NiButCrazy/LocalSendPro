@@ -100,7 +100,7 @@ class _WindowWatcherState extends State<WindowWatcher> with WindowListener, Refe
     try {
       final settings = ref.read(settingsProvider);
       if (settings.minimizeToTray || settings.backgroundMode) {
-        await hideToTray();
+        await hideToTray(trimWorkingSet: settings.backgroundMode);
       } else {
         await destroyTray();
         exit(0);

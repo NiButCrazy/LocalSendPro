@@ -111,7 +111,7 @@
       "framelessWindow": "无边框窗口",
       "minimizeToTray": "关闭时最小化到系统托盘",
       "backgroundMode": "轻量后台模式",
-      "backgroundModeDescription": "关闭窗口后驻留系统托盘，继续设备发现与文件接收，同时暂停界面渲染。",
+      "backgroundModeDescription": "关闭窗口后驻留系统托盘，继续设备发现与文件接收，同时暂停界面渲染并回收闲置内存。",
       "launchAtStartup": "登录系统后自动启动程序",
       "launchMinimized": "自动启动时隐藏窗口",
       "showInContextMenu": "在“发送到...”文件菜单中显示 LocalSend",

@@ -20,6 +20,7 @@ constexpr UINT_PTR kAnimationTimerId = 1;
 constexpr int kAnimationIntervalMs = 15;
 constexpr int kAnimationDurationMs = 180;
 constexpr int kAnimationSlide = 10;  // logical pixels
+constexpr BYTE kWindowAlpha = 242;   // ~95% opacity
 
 double EaseOutCubic(double t) {
   const double remaining = 1.0 - t;
@@ -626,7 +627,7 @@ void TransferProgressWindow::StartHideAnimation() {
     KillTimer(hwnd_, kAnimationTimerId);
     animating_ = false;
     hiding_ = false;
-    SetLayeredWindowAttributes(hwnd_, 0, 255, LWA_ALPHA);
+    SetLayeredWindowAttributes(hwnd_, 0, kWindowAlpha, LWA_ALPHA);
   }
 
   RECT rect = {};
@@ -731,26 +732,28 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
 
         if (hiding_) {
           SetLayeredWindowAttributes(
-              window, 0, static_cast<BYTE>(255 * (1.0 - eased)), LWA_ALPHA);
+              window, 0, static_cast<BYTE>(kWindowAlpha * (1.0 - eased)),
+              LWA_ALPHA);
           SetWindowPos(window, nullptr, animation_base_x_,
                        animation_base_y_ + slide, 0, 0,
                        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
           if (raw >= 1.0) {
             KillTimer(window, kAnimationTimerId);
             ShowWindow(window, SW_HIDE);
-            SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
+            SetLayeredWindowAttributes(window, 0, kWindowAlpha, LWA_ALPHA);
             animating_ = false;
             hiding_ = false;
           }
         } else {
-          SetLayeredWindowAttributes(
-              window, 0, static_cast<BYTE>(255 * eased), LWA_ALPHA);
+          SetLayeredWindowAttributes(window, 0,
+                                     static_cast<BYTE>(kWindowAlpha * eased),
+                                     LWA_ALPHA);
           SetWindowPos(window, nullptr, animation_base_x_,
                        animation_base_y_ + Scale(kAnimationSlide) - slide, 0, 0,
                        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
           if (raw >= 1.0) {
             KillTimer(window, kAnimationTimerId);
-            SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
+            SetLayeredWindowAttributes(window, 0, kWindowAlpha, LWA_ALPHA);
             animating_ = false;
           }
         }

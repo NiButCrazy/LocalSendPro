@@ -111,7 +111,7 @@
       "framelessWindow": "Frameless window",
       "minimizeToTray": "Minimize to the System Tray/Menu Bar when closing",
       "backgroundMode": "Lightweight background mode",
-      "backgroundModeDescription": "Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused.",
+      "backgroundModeDescription": "Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused and idle memory is returned to the system.",
       "launchAtStartup": "Autostart after login",
       "launchMinimized": "Autostart: Start hidden",
       "showInContextMenu": "Show LocalSend in context menu",
