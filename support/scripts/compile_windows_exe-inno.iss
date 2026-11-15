@@ -34,6 +34,10 @@ DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+#ifdef LooseRegister
+; Loose registration must be performed for the installing user, so install per-user (no UAC).
+PrivilegesRequired=lowest
+#endif
 OutputDir={#ResultDir}
 OutputBaseFilename=localsend
 SetupIconFile={#PayloadDir}\logo.ico
@@ -92,6 +96,13 @@ Source: "{#PayloadDir}\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recu
 Source: "{#PayloadDir}\{#MyAppExeName}.manifest"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\{#MyAppMsixHelper}"; DestDir: "{app}"; Flags: ignoreversion
 #endif
+#ifdef LooseRegister
+; Loose registration: manifest, logos and PRI index must sit next to localsend_app.exe (the package root).
+Source: "{#PayloadDir}\AppxManifest.xml"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PayloadDir}\Images\*"; DestDir: "{app}\Images"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PayloadDir}\resources.pri"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PayloadDir}\resources.scale-*.pri"; DestDir: "{app}"; Flags: ignoreversion
+#endif
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -100,11 +111,40 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+#ifdef LooseRegister
+; Loose registration needs no signature: register the manifest placed in {app} directly.
+; Registering loose files requires Developer Mode / sideloading to be enabled.
+Filename: "powershell.exe"; Parameters: "-NoProfile -Command Add-AppxPackage -Register '{app}\AppxManifest.xml'"; Flags: runhidden; Check: DeveloperModeEnabled
+#else
 #ifndef SkipMsixHelper
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Add-AppxPackage .\localsend_msix_helper.msix -ExternalLocation $(Get-Location)"; WorkingDir: {app}; Flags: nowait runhidden
 #endif
+#endif
 
 [UninstallRun]
+#ifdef LooseRegister
+Filename: "powershell.exe"; Parameters: "-NoProfile -Command Get-AppxPackage -Name LocalSend.App -Publisher 'CN=Ni But Crazy' | Remove-AppxPackage"; Flags: runhidden; RunOnceId: "RemoveLooseAppx"
+#else
 #ifndef SkipMsixHelper
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Get-AppxPackage LocalSend.App | Remove-AppxPackage"; Flags: nowait runhidden
+#endif
+#endif
+
+[Code]
+#ifdef LooseRegister
+function DeveloperModeEnabled(): Boolean;
+var
+  Value: Cardinal;
+begin
+  Result :=
+    (RegQueryDWordValue(HKLM64, 'SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock', 'AllowDevelopmentWithoutDevLicense', Value) and (Value = 1)) or
+    (RegQueryDWordValue(HKLM64, 'SOFTWARE\Policies\Microsoft\Windows\Appx', 'AllowDevelopmentWithoutDevLicense', Value) and (Value = 1));
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssPostInstall) and (not DeveloperModeEnabled()) then
+    MsgBox('LocalSend was installed, but Developer Mode is off, so the Share menu entry was not registered.' + #13#10 +
+           'Enable Developer Mode in Windows Settings, then run this installer again to enable sharing.', mbInformation, MB_OK);
+end;
 #endif
