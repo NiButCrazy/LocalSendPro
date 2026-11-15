@@ -950,6 +950,10 @@ class Translations$settingsTab$general$zh_CN extends Translations$settingsTab$ge
   @override
   String get saveWindowPlacementWindows => '退出时保存窗口位置';
   @override
+  String get alwaysOnTop => '窗口置顶';
+  @override
+  String get alwaysOnTopUnavailable => 'Wayland 下不支持';
+  @override
   String get minimizeToTray => '关闭时最小化到系统托盘';
   @override
   String get backgroundMode => '轻量后台模式';
@@ -991,7 +995,7 @@ class Translations$settingsTab$receive$zh_CN extends Translations$settingsTab$re
   @override
   String get saveToHistory => '保存到历史记录';
   @override
-  String get verifyChecksums => '接收文件时验证校验和';
+  String get verifyChecksums => '接收后校验文件完整性';
 }
 
 // Path: settingsTab.send
@@ -1006,7 +1010,7 @@ class Translations$settingsTab$send$zh_CN extends Translations$settingsTab$send$
   @override
   String get shareViaLinkAutoAccept => '通过链接分享：自动同意接收请求';
   @override
-  String get createChecksums => '发送文件时创建校验和';
+  String get createChecksums => '发送时生成完整性校验值';
 }
 
 // Path: settingsTab.network
@@ -1355,6 +1359,8 @@ class Translations$dialogs$favoriteEditDialog$zh_CN extends Translations$dialogs
   String get ip => 'IP 地址';
   @override
   String get port => '端口';
+  @override
+  String get invalidPort => '请输入 1 到 65535 之间的整数。';
 }
 
 // Path: dialogs.fileInfo

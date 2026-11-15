@@ -1146,8 +1146,8 @@ class Translations$settingsTab$receive$en {
   /// en: 'Save to history'
   String get saveToHistory => 'Save to history';
 
-  /// en: 'Verify checksums when receiving files'
-  String get verifyChecksums => 'Verify checksums when receiving files';
+  /// en: 'Verify file integrity after receiving'
+  String get verifyChecksums => 'Verify file integrity after receiving';
 }
 
 // Path: settingsTab.send
@@ -1164,8 +1164,8 @@ class Translations$settingsTab$send$en {
   /// en: 'Automatically accept requests in "Share via link" mode'
   String get shareViaLinkAutoAccept => 'Automatically accept requests in "Share via link" mode';
 
-  /// en: 'Create checksums when sending files'
-  String get createChecksums => 'Create checksums when sending files';
+  /// en: 'Generate integrity checksum when sending'
+  String get createChecksums => 'Generate integrity checksum when sending';
 }
 
 // Path: settingsTab.network
