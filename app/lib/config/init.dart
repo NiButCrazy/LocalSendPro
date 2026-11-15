@@ -36,6 +36,7 @@ import 'package:localsend_app/util/native/device_info_helper.dart';
 import 'package:localsend_app/util/native/macos_channel.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
+import 'package:localsend_app/util/native/window_helper.dart';
 import 'package:localsend_app/util/notification_strings.dart';
 import 'package:localsend_app/util/ui/dynamic_colors.dart';
 import 'package:localsend_app/util/ui/snackbar.dart';
@@ -124,6 +125,14 @@ Future<RefenaContainer> preInit(List<String> args) async {
     await WindowManager.instance.ensureInitialized();
     if (checkPlatformIsNotWaylandDesktop()) {
       await windowManager.setAlwaysOnTop(persistenceService.getAlwaysOnTop());
+    }
+    // Apply the persisted title bar style before the window becomes visible.
+    if (checkPlatformSupportsFramelessWindow()) {
+      try {
+        await applyFramelessWindow(persistenceService.isFramelessWindow());
+      } catch (e) {
+        _logger.warning('Applying the frameless window setting failed: $e');
+      }
     }
     await WindowDimensionsController(persistenceService).initDimensionsConfiguration();
     if (args.contains(startHiddenFlag)) {

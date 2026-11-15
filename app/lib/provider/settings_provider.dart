@@ -8,12 +8,15 @@ import 'package:localsend_app/model/state/settings_state.dart';
 import 'package:localsend_app/provider/persistence_provider.dart';
 import 'package:localsend_app/provider/window_dimensions_provider.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
+import 'package:localsend_app/util/native/window_helper.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
+import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
 final _listEq = const ListEquality().equals;
+final _logger = Logger('SettingsService');
 
 final settingsProvider = NotifierProvider<SettingsService, SettingsState>(
   (ref) {
@@ -71,6 +74,7 @@ class SettingsService extends PureNotifier<SettingsState> {
     sendMode: _persistence.getSendMode(),
     saveWindowPlacement: _persistence.getSaveWindowPlacement(),
     alwaysOnTop: _persistence.getAlwaysOnTop(),
+    framelessWindow: _persistence.isFramelessWindow(),
     enableAnimations: _persistence.getEnableAnimations(),
     deviceType: _persistence.getDeviceType(),
     deviceModel: _persistence.getDeviceModel(),
@@ -267,6 +271,27 @@ class SettingsService extends PureNotifier<SettingsState> {
     }
     await _persistence.setAlwaysOnTop(alwaysOnTop);
     state = state.copyWith(alwaysOnTop: alwaysOnTop);
+  }
+
+  Future<void> setFramelessWindow(bool framelessWindow) async {
+    if (!checkPlatformSupportsFramelessWindow()) {
+      return;
+    }
+    if (state.framelessWindow == framelessWindow) {
+      return;
+    }
+
+    try {
+      // Apply the native style first so the UI only shows the in-app bar
+      // after the native title bar is actually hidden (and vice versa).
+      await applyFramelessWindow(framelessWindow);
+    } catch (e) {
+      _logger.warning('Failed to update the window title bar style', e);
+      return;
+    }
+
+    await _persistence.setFramelessWindow(framelessWindow);
+    state = state.copyWith(framelessWindow: framelessWindow);
   }
 
   Future<void> setEnableAnimations(bool enableAnimations) async {

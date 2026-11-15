@@ -954,6 +954,8 @@ class Translations$settingsTab$general$zh_CN extends Translations$settingsTab$ge
   @override
   String get alwaysOnTopUnavailable => 'Wayland 下不支持';
   @override
+  String get framelessWindow => '无边框窗口';
+  @override
   String get minimizeToTray => '关闭时最小化到系统托盘';
   @override
   String get backgroundMode => '轻量后台模式';

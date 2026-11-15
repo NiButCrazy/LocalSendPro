@@ -34,6 +34,12 @@ bool checkPlatformHasTray() {
   return checkPlatform([TargetPlatform.windows, TargetPlatform.macOS, TargetPlatform.linux]);
 }
 
+/// This platform can hide the native title bar and use the in-app title bar.
+/// Web is excluded because window_manager is unavailable there.
+bool checkPlatformSupportsFramelessWindow() {
+  return !kIsWeb && checkPlatform([TargetPlatform.windows]);
+}
+
 /// This platform can receive share intents
 bool checkPlatformCanReceiveShareIntent() {
   return checkPlatform([TargetPlatform.android, TargetPlatform.iOS]);

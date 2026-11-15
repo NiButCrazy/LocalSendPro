@@ -132,6 +132,11 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     'alwaysOnTop',
     _$alwaysOnTop,
   );
+  static bool _$framelessWindow(SettingsState v) => v.framelessWindow;
+  static const Field<SettingsState, bool> _f$framelessWindow = Field(
+    'framelessWindow',
+    _$framelessWindow,
+  );
   static bool _$enableAnimations(SettingsState v) => v.enableAnimations;
   static const Field<SettingsState, bool> _f$enableAnimations = Field(
     'enableAnimations',
@@ -205,6 +210,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     #sendMode: _f$sendMode,
     #saveWindowPlacement: _f$saveWindowPlacement,
     #alwaysOnTop: _f$alwaysOnTop,
+    #framelessWindow: _f$framelessWindow,
     #enableAnimations: _f$enableAnimations,
     #deviceType: _f$deviceType,
     #deviceModel: _f$deviceModel,
@@ -241,6 +247,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
       sendMode: data.dec(_f$sendMode),
       saveWindowPlacement: data.dec(_f$saveWindowPlacement),
       alwaysOnTop: data.dec(_f$alwaysOnTop),
+      framelessWindow: data.dec(_f$framelessWindow),
       enableAnimations: data.dec(_f$enableAnimations),
       deviceType: data.dec(_f$deviceType),
       deviceModel: data.dec(_f$deviceModel),
@@ -343,6 +350,7 @@ abstract class SettingsStateCopyWith<$R, $In extends SettingsState, $Out>
     SendMode? sendMode,
     bool? saveWindowPlacement,
     bool? alwaysOnTop,
+    bool? framelessWindow,
     bool? enableAnimations,
     DeviceType? deviceType,
     String? deviceModel,
@@ -407,6 +415,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
     SendMode? sendMode,
     bool? saveWindowPlacement,
     bool? alwaysOnTop,
+    bool? framelessWindow,
     bool? enableAnimations,
     Object? deviceType = $none,
     Object? deviceModel = $none,
@@ -443,6 +452,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       if (saveWindowPlacement != null)
         #saveWindowPlacement: saveWindowPlacement,
       if (alwaysOnTop != null) #alwaysOnTop: alwaysOnTop,
+      if (framelessWindow != null) #framelessWindow: framelessWindow,
       if (enableAnimations != null) #enableAnimations: enableAnimations,
       if (deviceType != $none) #deviceType: deviceType,
       if (deviceModel != $none) #deviceModel: deviceModel,
@@ -487,6 +497,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       or: $value.saveWindowPlacement,
     ),
     alwaysOnTop: data.get(#alwaysOnTop, or: $value.alwaysOnTop),
+    framelessWindow: data.get(#framelessWindow, or: $value.framelessWindow),
     enableAnimations: data.get(#enableAnimations, or: $value.enableAnimations),
     deviceType: data.get(#deviceType, or: $value.deviceType),
     deviceModel: data.get(#deviceModel, or: $value.deviceModel),

@@ -1088,6 +1088,9 @@ class Translations$settingsTab$general$en {
   /// en: 'Not supported on Wayland'
   String get alwaysOnTopUnavailable => 'Not supported on Wayland';
 
+  /// en: 'Frameless window'
+  String get framelessWindow => 'Frameless window';
+
   /// en: 'Minimize to the System Tray/Menu Bar when closing'
   String get minimizeToTray => 'Minimize to the System Tray/Menu Bar when closing';
 

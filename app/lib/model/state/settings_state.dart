@@ -32,6 +32,7 @@ class SettingsState with SettingsStateMappable {
   final SendMode sendMode;
   final bool saveWindowPlacement;
   final bool alwaysOnTop;
+  final bool framelessWindow; // hide the native title bar and use the in-app one (Windows)
   final bool enableAnimations;
   final DeviceType? deviceType;
   final String? deviceModel;
@@ -66,6 +67,7 @@ class SettingsState with SettingsStateMappable {
     required this.sendMode,
     required this.saveWindowPlacement,
     required this.alwaysOnTop,
+    required this.framelessWindow,
     required this.enableAnimations,
     required this.deviceType,
     required this.deviceModel,

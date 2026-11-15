@@ -108,6 +108,7 @@
       "saveWindowPlacementWindows": "Save window position after exit",
       "alwaysOnTop": "Always on top",
       "alwaysOnTopUnavailable": "Not supported on Wayland",
+      "framelessWindow": "Frameless window",
       "minimizeToTray": "Minimize to the System Tray/Menu Bar when closing",
       "backgroundMode": "Lightweight background mode",
       "backgroundModeDescription": "Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused.",

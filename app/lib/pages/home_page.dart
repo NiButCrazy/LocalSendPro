@@ -10,6 +10,7 @@ import 'package:localsend_app/pages/tabs/receive_tab.dart';
 import 'package:localsend_app/pages/tabs/send_tab.dart';
 import 'package:localsend_app/pages/tabs/settings_tab.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/native/cross_file_converters.dart';
 import 'package:localsend_app/widget/responsive_builder.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -69,6 +70,7 @@ class _HomePageState extends State<HomePage> with Refena {
   Widget build(BuildContext context) {
     Translations.of(context); // rebuild on locale change
     final vm = context.watch(homePageControllerProvider);
+    final framelessWindow = context.watch(settingsProvider.select((settings) => settings.framelessWindow));
 
     return DropTarget(
       onDragEntered: (_) {
@@ -134,35 +136,46 @@ class _HomePageState extends State<HomePage> with Refena {
                     }).toList(),
                   ),
                 Expanded(
-                  child: SafeArea(
-                    left: sizingInformation.isMobile,
-                    child: Stack(
-                      children: [
-                        PageView(
-                          controller: vm.controller,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: const [
-                            ReceiveTab(),
-                            SendTab(),
-                            SettingsTab(),
-                          ],
-                        ),
-                        if (_dragAndDropIndicator)
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.file_download, size: 128),
-                                const SizedBox(height: 30),
-                                Text(t.sendTab.placeItems, style: Theme.of(context).textTheme.titleLarge),
-                              ],
-                            ),
+                  child: ColoredBox(
+                    color: framelessWindow && !sizingInformation.isMobile ? Theme.of(context).cardColorWithElevation : Colors.transparent,
+                    child: ClipRRect(
+                      borderRadius: framelessWindow && !sizingInformation.isMobile
+                          ? const BorderRadius.vertical(top: Radius.circular(12))
+                          : BorderRadius.zero,
+                      child: ColoredBox(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        child: SafeArea(
+                          left: sizingInformation.isMobile,
+                          child: Stack(
+                            children: [
+                              PageView(
+                                controller: vm.controller,
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: const [
+                                  ReceiveTab(),
+                                  SendTab(),
+                                  SettingsTab(),
+                                ],
+                              ),
+                              if (_dragAndDropIndicator)
+                                Container(
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).scaffoldBackgroundColor,
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.file_download, size: 128),
+                                      const SizedBox(height: 30),
+                                      Text(t.sendTab.placeItems, style: Theme.of(context).textTheme.titleLarge),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
+                        ),
+                      ),
                     ),
                   ),
                 ),

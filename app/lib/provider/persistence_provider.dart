@@ -65,6 +65,7 @@ const _windowWidth = 'ls_window_width';
 const _windowHeight = 'ls_window_height';
 const _saveWindowPlacement = 'ls_save_window_placement';
 const _alwaysOnTop = 'ls_always_on_top';
+const _framelessWindow = 'ls_frameless_window';
 
 // Settings
 const _showToken = 'ls_show_token';
@@ -571,6 +572,14 @@ class PersistenceService {
 
   Future<void> setAlwaysOnTop(bool alwaysOnTop) async {
     await _prefs.setBool(_alwaysOnTop, alwaysOnTop);
+  }
+
+  bool isFramelessWindow() {
+    return _prefs.getBool(_framelessWindow) ?? false;
+  }
+
+  Future<void> setFramelessWindow(bool framelessWindow) async {
+    await _prefs.setBool(_framelessWindow, framelessWindow);
   }
 
   bool getAlwaysOnTop() {

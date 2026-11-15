@@ -17,6 +17,7 @@ import 'package:localsend_app/widget/watcher/shortcut_watcher.dart';
 import 'package:localsend_app/widget/watcher/tray_watcher.dart';
 import 'package:localsend_app/widget/watcher/window_brightness_watcher.dart';
 import 'package:localsend_app/widget/watcher/window_watcher.dart';
+import 'package:localsend_app/widget/window_title_bar.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:refena_flutter/addons.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -94,7 +95,9 @@ class LocalSendApp extends StatelessWidget {
                 theme: getTheme(colorMode, customColor, Brightness.light, dynamicColors),
                 darkTheme: getTheme(colorMode, customColor, Brightness.dark, dynamicColors),
                 themeMode: colorMode == ColorMode.oled ? ThemeMode.dark : themeMode,
-                builder: (context, child) => WindowBrightnessWatcher(child: child!),
+                builder: (context, child) => WindowTitleBarWrapper(
+                  child: WindowBrightnessWatcher(child: child!),
+                ),
                 navigatorKey: context.read(navigationProvider).key,
                 home: RouterinoHome(
                   builder: () => const HomePage(

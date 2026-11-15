@@ -10,6 +10,7 @@ void main() {
       expect(AppLocale.en.translations.general.accept, 'Accept');
       expect(AppLocale.en.translations.settingsTab.general.backgroundMode, isNotEmpty);
       expect(AppLocale.en.translations.settingsTab.general.backgroundModeDescription, isNotEmpty);
+      expect(AppLocale.en.translations.settingsTab.general.framelessWindow, isNotEmpty);
     });
 
     test('All locales should be supported by Flutter', () {

@@ -29,4 +29,28 @@ void main() {
       expect(persistence.isBackgroundMode(), isTrue);
     });
   });
+
+  group('PersistenceService frameless window', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({
+        'ls_version': 4,
+        'ls_locale': 'en',
+        'ls_show_token': 'test-token',
+        'ls_alias': 'test-alias',
+        'ls_security_context': '{}',
+        'ls_color': 'localsend',
+      });
+    });
+
+    test('defaults to disabled', () async {
+      final persistence = await PersistenceService.initialize(supportsDynamicColors: false);
+      expect(persistence.isFramelessWindow(), isFalse);
+    });
+
+    test('persists the enabled state', () async {
+      final persistence = await PersistenceService.initialize(supportsDynamicColors: false);
+      await persistence.setFramelessWindow(true);
+      expect(persistence.isFramelessWindow(), isTrue);
+    });
+  });
 }

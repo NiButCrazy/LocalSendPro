@@ -98,6 +98,14 @@ class SettingsTab extends StatelessWidget {
                           }
                         : null,
                   ),
+                  if (checkPlatformSupportsFramelessWindow())
+                    _BooleanEntry(
+                      label: t.settingsTab.general.framelessWindow,
+                      value: vm.settings.framelessWindow,
+                      onChanged: (b) async {
+                        await ref.notifier(settingsProvider).setFramelessWindow(b);
+                      },
+                    ),
 
                   /// Wayland does window position handling, so there's no need for it. See [https://github.com/localsend/localsend/issues/544]
                   if (vm.advanced && checkPlatformIsNotWaylandDesktop())
