@@ -165,6 +165,8 @@ class Translations$general$zh_CN extends Translations$general$en {
   @override
   String get restart => '重启';
   @override
+  String get retry => '重试';
+  @override
   String get settings => '设置';
   @override
   String get skipped => '已跳过';

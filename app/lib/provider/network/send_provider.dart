@@ -91,11 +91,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     required Device target,
     required List<CrossFile> files,
     required bool background,
+    String? sessionIdOverride,
   }) async {
     // Pinned to the device the user picked, so the request is not sent at all
     // if someone else answers on that address.
     final client = ref.read(httpProvider).pinnedTo(target.fingerprint);
-    final sessionId = _uuid.v4();
+    final sessionId = sessionIdOverride ?? _uuid.v4();
     final createChecksums = ref.read(settingsProvider).createChecksums;
 
     // The ids are assigned upfront, so the checksums calculated below
@@ -833,6 +834,58 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
             ),
           );
     }
+  }
+
+  /// Retries a failed session with the same target and files.
+  ///
+  /// Starts a fresh session (new ids, freshly calculated checksums) and replaces the
+  /// current send page with the waiting page of that session.
+  void retrySession(String sessionId) {
+    final session = state[sessionId];
+    if (session == null) {
+      return;
+    }
+
+    final files = session.files.values
+        .map(
+          (sendingFile) => CrossFile(
+            name: sendingFile.file.fileName,
+            fileType: sendingFile.file.fileType,
+            size: sendingFile.file.size,
+            thumbnail: sendingFile.thumbnail,
+            asset: sendingFile.asset,
+            path: sendingFile.path,
+            bytes: sendingFile.bytes,
+            lastModified: sendingFile.file.metadata?.lastModified,
+            lastAccessed: sendingFile.file.metadata?.lastAccessed,
+          ),
+        )
+        .toList();
+    if (files.isEmpty) {
+      return;
+    }
+
+    final newSessionId = _uuid.v4();
+    unawaited(
+      startSession(
+        target: session.target,
+        files: files,
+        background: false,
+        sessionIdOverride: newSessionId,
+      ),
+    );
+    closeSession(sessionId);
+
+    unawaited(
+      Routerino.context.pushReplacement(
+        () => SendPage(
+          showAppBar: true,
+          closeSessionOnClose: false,
+          sessionId: newSessionId,
+        ),
+        transition: RouterinoTransition.fade(),
+      ),
+    );
   }
 
   /// Closes the session

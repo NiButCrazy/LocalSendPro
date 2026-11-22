@@ -22,6 +22,15 @@ import 'package:refena_flutter/addons.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
 
+/// Session states the user can retry with the same device and files.
+const _retryableStatuses = {
+  SessionStatus.declined,
+  SessionStatus.recipientBusy,
+  SessionStatus.tooManyAttempts,
+  SessionStatus.canceledByReceiver,
+  SessionStatus.finishedWithErrors,
+};
+
 class SendPage extends StatefulWidget {
   final bool showAppBar;
   final bool closeSessionOnClose;
@@ -238,13 +247,26 @@ class _SendPageState extends State<SendPage> with Refena {
                               _ => const SizedBox(),
                             },
                             Center(
-                              child: FilledButton.icon(
-                                onPressed: () {
-                                  _cancel();
-                                  context.global.dispatch(NavigateAction.popUntilRoot());
-                                },
-                                icon: Icon(waiting ? Icons.close : Icons.check_circle),
-                                label: Text(waiting ? t.general.cancel : t.general.close),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_retryableStatuses.contains(sendState.status)) ...[
+                                    FilledButton.tonalIcon(
+                                      onPressed: () => ref.notifier(sendProvider).retrySession(widget.sessionId),
+                                      icon: const Icon(Icons.refresh),
+                                      label: Text(t.general.retry),
+                                    ),
+                                    const SizedBox(width: 12),
+                                  ],
+                                  FilledButton.icon(
+                                    onPressed: () {
+                                      _cancel();
+                                      context.global.dispatch(NavigateAction.popUntilRoot());
+                                    },
+                                    icon: Icon(waiting ? Icons.close : Icons.check_circle),
+                                    label: Text(waiting ? t.general.cancel : t.general.close),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

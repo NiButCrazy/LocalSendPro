@@ -173,6 +173,9 @@ class Translations$general$en {
   /// en: 'Restart'
   String get restart => 'Restart';
 
+  /// en: 'Retry'
+  String get retry => 'Retry';
+
   /// en: 'Settings'
   String get settings => 'Settings';
 
