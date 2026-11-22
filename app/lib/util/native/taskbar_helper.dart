@@ -13,10 +13,14 @@ class TaskbarHelper {
 
   static Future<void> clearProgressBar() async {
     _lastProgressPercent = null;
-    if (_isWindows) {
-      await WindowsTaskbar.setProgressMode(TaskbarProgressMode.noProgress);
-    } else if (_isMacos) {
-      await updateDockProgress(1.0);
+    try {
+      if (_isWindows) {
+        await WindowsTaskbar.setProgressMode(TaskbarProgressMode.noProgress);
+      } else if (_isMacos) {
+        await updateDockProgress(1.0);
+      }
+    } catch (_) {
+      // Best effort: the taskbar integration can fail while the app is shutting down.
     }
   }
 

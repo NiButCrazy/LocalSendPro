@@ -114,7 +114,8 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
       }
 
       setState(() {
-        final receiveSession = ref.read(serverProvider)?.session;
+        final currentSession = ref.read(serverProvider)?.session;
+        final receiveSession = currentSession?.sessionId == widget.sessionId ? currentSession : null;
         if (receiveSession != null) {
           _files = receiveSession.files.values.map((f) => f.file).toList();
         } else {
@@ -137,7 +138,8 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
   }
 
   void _exit({required bool closeSession}) async {
-    final receiveSession = ref.read(serverProvider.select((s) => s?.session));
+    final currentReceiveSession = ref.read(serverProvider.select((s) => s?.session));
+    final receiveSession = currentReceiveSession?.sessionId == widget.sessionId ? currentReceiveSession : null;
     final sendSession = ref.read(sendProvider)[widget.sessionId];
     final SessionStatus? status = receiveSession?.status ?? sendSession?.status;
     final keepSession = !closeSession && (status == SessionStatus.sending || status == SessionStatus.finishedWithErrors);
@@ -158,7 +160,8 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
       false => true,
     };
     if (result) {
-      final receiveSession = ref.read(serverProvider)?.session;
+      final currentReceiveSession = ref.read(serverProvider)?.session;
+      final receiveSession = currentReceiveSession?.sessionId == widget.sessionId ? currentReceiveSession : null;
       final sendState = ref.read(sendProvider)[widget.sessionId];
 
       if (receiveSession != null) {
@@ -201,7 +204,8 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
 
     // No select: comparing the selected session runs the dart_mappable deep equality
     // over the whole files map on every state change.
-    final receiveSession = ref.watch(serverProvider)?.session;
+    final currentReceiveSession = ref.watch(serverProvider)?.session;
+    final receiveSession = currentReceiveSession?.sessionId == widget.sessionId ? currentReceiveSession : null;
     final sendSession = ref.watch(sendProvider)[widget.sessionId];
 
     final SessionState? commonSessionState = receiveSession ?? sendSession;
@@ -341,18 +345,18 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
 
                 final String? filePath;
                 if (receiveSession != null && fileStatus == FileStatus.finished && !savedToGallery) {
-                  filePath = receiveSession.files[file.id]!.path;
+                  filePath = receiveSession.files[file.id]?.path;
                 } else if (sendSession != null) {
-                  filePath = sendSession.files[file.id]!.path;
+                  filePath = sendSession.files[file.id]?.path;
                 } else {
                   filePath = null;
                 }
 
                 final String? errorMessage;
                 if (receiveSession != null) {
-                  errorMessage = receiveSession.files[file.id]!.errorMessage;
+                  errorMessage = receiveSession.files[file.id]?.errorMessage;
                 } else if (sendSession != null) {
-                  errorMessage = sendSession.files[file.id]!.errorMessage;
+                  errorMessage = sendSession.files[file.id]?.errorMessage;
                 } else {
                   errorMessage = null;
                 }
@@ -360,8 +364,8 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
                 final Uint8List? thumbnail;
                 final AssetEntity? asset;
                 if (sendSession != null) {
-                  thumbnail = sendSession.files[file.id]!.thumbnail;
-                  asset = sendSession.files[file.id]!.asset;
+                  thumbnail = sendSession.files[file.id]?.thumbnail;
+                  asset = sendSession.files[file.id]?.asset;
                 } else {
                   thumbnail = null;
                   asset = null;
@@ -440,7 +444,7 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
                             ],
                           ),
                         ),
-                        if (sendSession != null && fileStatus == FileStatus.failed)
+                        if (sendSession != null && fileStatus == FileStatus.failed && sendSession.files.containsKey(file.id))
                           IconButton(
                             icon: const Icon(Icons.refresh),
                             onPressed: () async {
