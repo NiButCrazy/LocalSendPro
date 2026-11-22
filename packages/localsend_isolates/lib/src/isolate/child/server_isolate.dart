@@ -392,9 +392,13 @@ Future<void> setupHttpServerIsolate(
     init: (ref) async {
       // Initialize the platform method channel so SAF (file creation) and the
       // gallery plugin work inside this isolate.
-      BackgroundIsolateBinaryMessenger.ensureInitialized(
-        ref.read(syncProvider).rootIsolateToken as RootIsolateToken,
-      );
+      // Desktop platforms have no such plugins, and their engine cannot route
+      // background-isolate messages, which would report a TypeError.
+      if (Platform.isAndroid || Platform.isIOS) {
+        BackgroundIsolateBinaryMessenger.ensureInitialized(
+          ref.read(syncProvider).rootIsolateToken as RootIsolateToken,
+        );
+      }
     },
     handler: (ref, task) async {
       switch (task.data) {

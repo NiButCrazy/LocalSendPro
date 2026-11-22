@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
@@ -118,9 +120,12 @@ Future<void> setupHttpUploadIsolate(
     init: (ref) async {
       // Initialize the platform method channel so getFileDescriptorAndroid
       // (used to resolve "content://" files) works inside this isolate.
-      BackgroundIsolateBinaryMessenger.ensureInitialized(
-        ref.read(syncProvider).rootIsolateToken as RootIsolateToken,
-      );
+      // Only Android needs it; other platforms cannot route background-isolate messages.
+      if (Platform.isAndroid) {
+        BackgroundIsolateBinaryMessenger.ensureInitialized(
+          ref.read(syncProvider).rootIsolateToken as RootIsolateToken,
+        );
+      }
     },
     handler: (ref, task) async {
       final HttpUploadFilesTask uploadTask;
