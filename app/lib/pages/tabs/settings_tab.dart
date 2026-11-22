@@ -160,7 +160,9 @@ class SettingsTab extends StatelessWidget {
                             return DropdownMenuItem(
                               value: seconds,
                               alignment: Alignment.center,
-                              child: Text(t.settingsTab.general.seconds(n: seconds)),
+                              child: Text(
+                                seconds == 0 ? t.settingsTab.general.transferCompletedDurationOff : t.settingsTab.general.seconds(n: seconds),
+                              ),
                             );
                           }).toList(),
                           onChanged: (seconds) async {

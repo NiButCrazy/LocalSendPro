@@ -1126,6 +1126,9 @@ class Translations$settingsTab$general$en {
   /// en: '{n} s'
   String seconds({required Object n}) => '${n} s';
 
+  /// en: 'Not shown'
+  String get transferCompletedDurationOff => 'Not shown';
+
   /// en: 'Autostart after login'
   String get launchAtStartup => 'Autostart after login';
 

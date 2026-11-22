@@ -116,6 +116,7 @@
       "showTrayIconDescription": "When hidden, closing the window still keeps LocalSend running in the background. Launch LocalSend again to restore the window.",
       "transferCompletedDuration": "Transfer completion notification",
       "seconds": "{n} s",
+      "transferCompletedDurationOff": "Not shown",
       "launchAtStartup": "Autostart after login",
       "launchMinimized": "Autostart: Start hidden",
       "showInContextMenu": "Show LocalSend in context menu",

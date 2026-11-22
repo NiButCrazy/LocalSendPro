@@ -978,6 +978,8 @@ class Translations$settingsTab$general$zh_CN extends Translations$settingsTab$ge
   @override
   String seconds({required Object n}) => '${n} 秒';
   @override
+  String get transferCompletedDurationOff => '不显示';
+  @override
   String get launchAtStartup => '登录系统后自动启动程序';
   @override
   String get launchMinimized => '自动启动时隐藏窗口';

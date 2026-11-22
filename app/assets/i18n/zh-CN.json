@@ -116,6 +116,7 @@
       "showTrayIconDescription": "隐藏后关闭窗口仍会在后台运行，再次启动 LocalSend 即可恢复窗口。",
       "transferCompletedDuration": "传输完成通知停留时长",
       "seconds": "{n} 秒",
+      "transferCompletedDurationOff": "不显示",
       "launchAtStartup": "登录系统后自动启动程序",
       "launchMinimized": "自动启动时隐藏窗口",
       "showInContextMenu": "在“发送到...”文件菜单中显示 LocalSend",
