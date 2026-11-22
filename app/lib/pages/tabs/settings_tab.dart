@@ -13,6 +13,7 @@ import 'package:localsend_app/pages/tabs/settings_tab_controller.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/version_provider.dart';
+import 'package:localsend_app/provider/window_dimensions_provider.dart';
 import 'package:localsend_app/util/alias_generator.dart';
 import 'package:localsend_app/util/device_type_ext.dart';
 import 'package:localsend_app/util/i18n.dart';
@@ -36,6 +37,7 @@ import 'package:localsend_isolates/model/device.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:window_manager/window_manager.dart';
 
 /// Local enhanced build number, shown as `<upstream version>-Pro <x.x.x>`.
 const _proVersion = '1.0.0';
@@ -666,6 +668,12 @@ class SettingsTab extends StatelessWidget {
                     foregroundColor: Theme.of(context).colorScheme.error,
                   ),
                   onPressed: () async {
+                    // 与 WindowWatcher.onWindowClose 一致：退出前保存窗口位置与尺寸。
+                    final dimensions = ref.read(windowDimensionProvider);
+                    await dimensions.storeDimensions(
+                      windowOffset: await windowManager.getPosition(),
+                      windowSize: await windowManager.getSize(),
+                    );
                     await destroyTray();
                     exit(0);
                   },

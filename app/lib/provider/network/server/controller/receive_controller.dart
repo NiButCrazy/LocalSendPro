@@ -769,10 +769,10 @@ class ReceiveController {
       _logger.warning('Failed to notify sender', e);
     }
 
-    closeSession();
+    closeSession(outcome: TransferOutcome.canceled);
   }
 
-  void closeSession() {
+  void closeSession({TransferOutcome? outcome}) {
     _hideWaitingWindow();
 
     final sessionId = server.getStateOrNull()?.session?.sessionId;
@@ -780,7 +780,7 @@ class ReceiveController {
       return;
     }
 
-    TransferNotification.stop(sessionId);
+    TransferNotification.stop(sessionId, outcome: outcome);
 
     server.setState(
       (oldState) => oldState?.copyWith(

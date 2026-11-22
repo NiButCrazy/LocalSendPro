@@ -270,6 +270,10 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
             cancelToken: prepareUploadCancelToken,
           );
         } on rust_http.RsHttpClientError_StatusCode catch (e) {
+          // 用户已取消时，取消引发的 HTTP 错误不应把会话改回失败状态。
+          if (_isCanceledBySender(sessionId)) {
+            return;
+          }
           switch (e.status) {
             case 401:
               invalidPin = true;
@@ -332,6 +336,9 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
               return;
           }
         } catch (e) {
+          if (_isCanceledBySender(sessionId)) {
+            return;
+          }
           state = state.updateSession(
             sessionId: sessionId,
             state: (s) => s?.copyWith(
@@ -366,6 +373,9 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
           ),
         );
       } catch (e) {
+        if (_isCanceledBySender(sessionId)) {
+          return;
+        }
         state = state.updateSession(
           sessionId: sessionId,
           state: (s) => s?.copyWith(
@@ -511,6 +521,9 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     _finish(sessionId: sessionId);
   }
 
+  /// 用户在请求进行期间取消后，取消引发的异常不应覆盖取消状态。
+  bool _isCanceledBySender(String sessionId) => state[sessionId]?.status == SessionStatus.canceledBySender;
+
   void _finish({required String sessionId}) {
     final sessionState = state[sessionId];
     if (sessionState == null) {
@@ -518,15 +531,20 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     }
 
     final hasError = ref.read(fileTransferProvider).getStatuses(sessionId).any((status) => status == FileStatus.failed);
-    final outcome = sessionState.status != SessionStatus.sending
-        ? TransferOutcome.canceled
-        : (hasError ? TransferOutcome.failed : TransferOutcome.completed);
+    // 按实际结束方式推导结果。_sendFiles 在 prepareUpload 阶段就会把拒绝、忙、网络错误、
+    // 响应解析失败写成非 sending 状态，所以只判断“不是发送中”会把每次失败都报成取消。
+    final outcome = switch (sessionState.status) {
+      SessionStatus.canceledBySender || SessionStatus.canceledByReceiver => TransferOutcome.canceled,
+      SessionStatus.sending || SessionStatus.finished => hasError ? TransferOutcome.failed : TransferOutcome.completed,
+      _ => TransferOutcome.failed,
+    };
 
     // The transfer is over, the process no longer needs to be kept alive for it.
     TransferNotification.stop(sessionId, outcome: outcome);
 
     if (state[sessionId]!.status != SessionStatus.sending) {
-      _logger.info('Transfer was canceled.');
+      // 取消或 prepareUpload 失败已经写入终态，这里不再覆盖。
+      _logger.info('Transfer already ended with ${state[sessionId]!.status}.');
     } else {
       if (!hasError && sessionState.background == true) {
         // close session because everything is fine and it is in background
