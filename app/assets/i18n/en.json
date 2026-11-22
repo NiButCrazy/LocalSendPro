@@ -52,7 +52,8 @@
       "favorites": "Favorites",
       "on": "@:general.on"
     },
-    "link": "Receive via link"
+    "link": "Receive via link",
+    "adminModeTooltip": "Running as administrator: files cannot be dragged in from Explorer."
   },
   "sendTab": {
     "title": "Send",

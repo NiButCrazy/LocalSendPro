@@ -4,6 +4,7 @@ import 'package:localsend_app/model/state/server/server_state.dart';
 import 'package:localsend_app/pages/home_page.dart';
 import 'package:localsend_app/pages/home_page_controller.dart';
 import 'package:localsend_app/pages/web_share_page.dart';
+import 'package:localsend_app/provider/administrator_provider.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
 import 'package:localsend_app/provider/local_ip_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
@@ -124,14 +125,33 @@ class _CornerButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAdministrator = context.watch(administratorProvider);
+
     return Align(
       alignment: Alignment.topRight,
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: CustomIconButton(
-          key: const ValueKey('info-btn'),
-          onPressed: toggleAdvanced,
-          child: const Icon(Icons.info),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (isAdministrator)
+              Tooltip(
+                message: t.receiveTab.adminModeTooltip,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                  child: Icon(
+                    Icons.shield_outlined,
+                    size: 24,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            CustomIconButton(
+              key: const ValueKey('info-btn'),
+              onPressed: toggleAdvanced,
+              child: const Icon(Icons.info),
+            ),
+          ],
         ),
       ),
     );

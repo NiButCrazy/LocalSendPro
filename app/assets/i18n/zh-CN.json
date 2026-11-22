@@ -52,7 +52,8 @@
       "favorites": "收藏夹",
       "on": "@:general.on"
     },
-    "link": "通过链接接收"
+    "link": "通过链接接收",
+    "adminModeTooltip": "当前以管理员身份运行：无法从资源管理器拖拽文件到窗口。"
   },
   "sendTab": {
     "title": "发送",

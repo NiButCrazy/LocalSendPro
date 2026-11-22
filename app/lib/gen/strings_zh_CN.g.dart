@@ -197,6 +197,8 @@ class Translations$receiveTab$zh_CN extends Translations$receiveTab$en {
   late final Translations$receiveTab$quickSave$zh_CN quickSave = Translations$receiveTab$quickSave$zh_CN.internal(_root);
   @override
   String get link => '通过链接接收';
+  @override
+  String get adminModeTooltip => '当前以管理员身份运行：无法从资源管理器拖拽文件到窗口。';
 }
 
 // Path: sendTab

@@ -214,6 +214,9 @@ class Translations$receiveTab$en {
 
   /// en: 'Receive via link'
   String get link => 'Receive via link';
+
+  /// en: 'Running as administrator: files cannot be dragged in from Explorer.'
+  String get adminModeTooltip => 'Running as administrator: files cannot be dragged in from Explorer.';
 }
 
 // Path: sendTab
