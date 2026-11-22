@@ -217,6 +217,13 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
         if (!mounted) {
           return;
         }
+        // A newer request replaced this session. Its own ReceivePage is already being pushed
+        // and drives navigation; popping to the root here would pop that page, whose PopScope
+        // would decline the request.
+        final newerReceiveSession = ref.read(serverProvider)?.session;
+        if (newerReceiveSession != null && newerReceiveSession.sessionId != widget.sessionId) {
+          return;
+        }
         if (ref.read(serverProvider)?.webUpload == true) {
           context.global.dispatch(NavigateAction.popUntil<WebSharePage>());
         } else {
@@ -440,6 +447,16 @@ class _ProgressPageState extends State<ProgressPage> with Refena {
                                       ),
                                     ],
                                   ],
+                                ),
+                              if (errorMessage != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    errorMessage,
+                                    style: TextStyle(color: Theme.of(context).colorScheme.warning, height: 1.2),
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                             ],
                           ),

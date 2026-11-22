@@ -814,13 +814,41 @@ void _cancelBySender(ServerUtils server) {
     Routerino.context.popUntil(ReceivePage);
   }
 
+  // Files still in flight will never finish. Mark them failed and keep the reason on the
+  // session entries so the progress page can show it next to each file.
+  final transferNotifier = server.ref.notifier(fileTransferProvider);
+  final canceledReason = t.progressPage.total.title.canceledSender;
+  final unfinishedFileIds = {
+    for (final file in receiveSession.files.values)
+      if (const {FileStatus.queue, FileStatus.sending}.contains(
+        transferNotifier.getStatus(sessionId: receiveSession.sessionId, fileId: file.file.id),
+      ))
+        file.file.id,
+  };
+  if (unfinishedFileIds.isNotEmpty) {
+    transferNotifier.setStatuses(
+      sessionId: receiveSession.sessionId,
+      statuses: {for (final fileId in unfinishedFileIds) fileId: FileStatus.failed},
+    );
+  }
+
   server.setState(
-    (oldState) => oldState?.copyWith(
-      session: oldState.session?.copyWith(
-        status: SessionStatus.canceledBySender,
-        endTime: DateTime.now().millisecondsSinceEpoch,
-      ),
-    ),
+    (oldState) {
+      final session = oldState?.session;
+      if (oldState == null || session == null) {
+        return oldState;
+      }
+      return oldState.copyWith(
+        session: session.copyWith(
+          status: SessionStatus.canceledBySender,
+          endTime: DateTime.now().millisecondsSinceEpoch,
+          files: session.files.map(
+            (fileId, file) =>
+                unfinishedFileIds.contains(fileId) ? MapEntry(fileId, file.copyWith(errorMessage: canceledReason)) : MapEntry(fileId, file),
+          ),
+        ),
+      );
+    },
   );
 }
 
