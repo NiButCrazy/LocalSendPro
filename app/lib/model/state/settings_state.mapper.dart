@@ -115,6 +115,17 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     'backgroundMode',
     _$backgroundMode,
   );
+  static bool _$showTrayIcon(SettingsState v) => v.showTrayIcon;
+  static const Field<SettingsState, bool> _f$showTrayIcon = Field(
+    'showTrayIcon',
+    _$showTrayIcon,
+  );
+  static int _$transferCompletedDuration(SettingsState v) =>
+      v.transferCompletedDuration;
+  static const Field<SettingsState, int> _f$transferCompletedDuration = Field(
+    'transferCompletedDuration',
+    _$transferCompletedDuration,
+  );
   static bool _$https(SettingsState v) => v.https;
   static const Field<SettingsState, bool> _f$https = Field('https', _$https);
   static SendMode _$sendMode(SettingsState v) => v.sendMode;
@@ -206,6 +217,8 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     #autoFinish: _f$autoFinish,
     #minimizeToTray: _f$minimizeToTray,
     #backgroundMode: _f$backgroundMode,
+    #showTrayIcon: _f$showTrayIcon,
+    #transferCompletedDuration: _f$transferCompletedDuration,
     #https: _f$https,
     #sendMode: _f$sendMode,
     #saveWindowPlacement: _f$saveWindowPlacement,
@@ -243,6 +256,8 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
       autoFinish: data.dec(_f$autoFinish),
       minimizeToTray: data.dec(_f$minimizeToTray),
       backgroundMode: data.dec(_f$backgroundMode),
+      showTrayIcon: data.dec(_f$showTrayIcon),
+      transferCompletedDuration: data.dec(_f$transferCompletedDuration),
       https: data.dec(_f$https),
       sendMode: data.dec(_f$sendMode),
       saveWindowPlacement: data.dec(_f$saveWindowPlacement),
@@ -346,6 +361,8 @@ abstract class SettingsStateCopyWith<$R, $In extends SettingsState, $Out>
     bool? autoFinish,
     bool? minimizeToTray,
     bool? backgroundMode,
+    bool? showTrayIcon,
+    int? transferCompletedDuration,
     bool? https,
     SendMode? sendMode,
     bool? saveWindowPlacement,
@@ -411,6 +428,8 @@ class _SettingsStateCopyWithImpl<$R, $Out>
     bool? autoFinish,
     bool? minimizeToTray,
     bool? backgroundMode,
+    bool? showTrayIcon,
+    int? transferCompletedDuration,
     bool? https,
     SendMode? sendMode,
     bool? saveWindowPlacement,
@@ -447,6 +466,9 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       if (autoFinish != null) #autoFinish: autoFinish,
       if (minimizeToTray != null) #minimizeToTray: minimizeToTray,
       if (backgroundMode != null) #backgroundMode: backgroundMode,
+      if (showTrayIcon != null) #showTrayIcon: showTrayIcon,
+      if (transferCompletedDuration != null)
+        #transferCompletedDuration: transferCompletedDuration,
       if (https != null) #https: https,
       if (sendMode != null) #sendMode: sendMode,
       if (saveWindowPlacement != null)
@@ -490,6 +512,11 @@ class _SettingsStateCopyWithImpl<$R, $Out>
     autoFinish: data.get(#autoFinish, or: $value.autoFinish),
     minimizeToTray: data.get(#minimizeToTray, or: $value.minimizeToTray),
     backgroundMode: data.get(#backgroundMode, or: $value.backgroundMode),
+    showTrayIcon: data.get(#showTrayIcon, or: $value.showTrayIcon),
+    transferCompletedDuration: data.get(
+      #transferCompletedDuration,
+      or: $value.transferCompletedDuration,
+    ),
     https: data.get(#https, or: $value.https),
     sendMode: data.get(#sendMode, or: $value.sendMode),
     saveWindowPlacement: data.get(

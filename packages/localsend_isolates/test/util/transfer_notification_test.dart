@@ -22,9 +22,14 @@ void main() {
       const NotificationStrings(
         titleReceiving: 'Receiving files',
         titleSending: 'Sending files',
+        titleCompleted: 'Transfer complete',
+        titleFailed: 'Transfer failed',
+        titleCanceled: 'Transfer canceled',
+        completionCountdown: _completionCountdown,
         remainingTimeMinutes: _remainingMinutes,
         remainingTimeLong: _remainingLong,
       ),
+      completionDisplayDuration: Duration.zero,
     );
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
@@ -91,6 +96,86 @@ void main() {
     expect(calls.map((call) => call.method), contains('hideProgress'));
   });
 
+  test('shows the completion text before hiding', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.init(
+      const NotificationStrings(
+        titleReceiving: 'Receiving files',
+        titleSending: 'Sending files',
+        titleCompleted: 'Transfer complete',
+        titleFailed: 'Transfer failed',
+        titleCanceled: 'Transfer canceled',
+        completionCountdown: _completionCountdown,
+        remainingTimeMinutes: _remainingMinutes,
+        remainingTimeLong: _remainingLong,
+      ),
+      completionDisplayDuration: const Duration(seconds: 1),
+    );
+
+    TransferNotification.start(sessionId: 'a', receiving: false);
+    TransferNotification.update(
+      sessionId: 'a',
+      currentBytes: 100,
+      totalBytes: 100,
+      finishedFiles: 2,
+      totalFiles: 2,
+      startTime: null,
+      endTime: null,
+    );
+    TransferNotification.stop('a', outcome: TransferOutcome.completed);
+    await Future<void>.delayed(Duration.zero);
+
+    final completed = calls.lastWhere((call) => call.method == 'showProgress');
+    final arguments = completed.arguments as Map<Object?, Object?>;
+    expect(arguments['title'], 'Transfer complete\u00012/2');
+    expect(arguments['text'], startsWith('100%'));
+    expect(arguments['text'], contains('100 B / 100 B'));
+    expect(arguments['text'], contains('1s left'));
+    expect(arguments['progress'], 1.0);
+    expect(calls.map((call) => call.method), isNot(contains('hideProgress')));
+
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    expect(calls.map((call) => call.method), contains('hideProgress'));
+  });
+
+  test('shows the failure text with the current progress', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.init(
+      const NotificationStrings(
+        titleReceiving: 'Receiving files',
+        titleSending: 'Sending files',
+        titleCompleted: 'Transfer complete',
+        titleFailed: 'Transfer failed',
+        titleCanceled: 'Transfer canceled',
+        completionCountdown: _completionCountdown,
+        remainingTimeMinutes: _remainingMinutes,
+        remainingTimeLong: _remainingLong,
+      ),
+      completionDisplayDuration: const Duration(seconds: 1),
+    );
+
+    TransferNotification.start(sessionId: 'a', receiving: true);
+    TransferNotification.update(
+      sessionId: 'a',
+      currentBytes: 50,
+      totalBytes: 100,
+      finishedFiles: 1,
+      totalFiles: 2,
+      startTime: null,
+      endTime: null,
+    );
+    TransferNotification.stop('a', outcome: TransferOutcome.failed);
+    await Future<void>.delayed(Duration.zero);
+
+    final failed = calls.lastWhere((call) => call.method == 'showProgress');
+    final arguments = failed.arguments as Map<Object?, Object?>;
+    expect(arguments['title'], 'Transfer failed\u00011/2');
+    expect(arguments['text'], startsWith('50%'));
+    expect(arguments['text'], contains('50 B / 100 B'));
+    expect(arguments['text'], contains('1s left'));
+    expect(arguments['progress'], 0.5);
+  });
+
   test('does nothing on non-Windows platforms', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
@@ -128,5 +213,7 @@ void main() {
 }
 
 String _remainingMinutes({required Object m, required Object ss}) => '$m:$ss';
+
+String _completionCountdown({required Object seconds}) => '${seconds}s left';
 
 String _remainingLong({required num h, required num m}) => '${h}h ${m}m';

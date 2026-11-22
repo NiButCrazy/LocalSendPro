@@ -10,6 +10,18 @@ class NotificationStrings {
   /// Title while files are being sent, e.g. "Sending files".
   final String titleSending;
 
+  /// Title shown after a transfer has finished successfully, e.g. "Transfer complete".
+  final String titleCompleted;
+
+  /// Title shown after a transfer failed, e.g. "Transfer failed".
+  final String titleFailed;
+
+  /// Title shown after a transfer was canceled or interrupted, e.g. "Transfer canceled".
+  final String titleCanceled;
+
+  /// Countdown shown where the remaining time was, e.g. "3s left".
+  final String Function({required Object seconds}) completionCountdown;
+
   /// Remaining time below an hour, e.g. "1:30" or "0:45". [ss] is zero padded.
   final String Function({required Object m, required Object ss}) remainingTimeMinutes;
 
@@ -19,6 +31,10 @@ class NotificationStrings {
   const NotificationStrings({
     required this.titleReceiving,
     required this.titleSending,
+    required this.titleCompleted,
+    required this.titleFailed,
+    required this.titleCanceled,
+    required this.completionCountdown,
     required this.remainingTimeMinutes,
     required this.remainingTimeLong,
   });

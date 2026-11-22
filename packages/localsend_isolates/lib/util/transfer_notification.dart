@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:localsend_isolates/util/file_size_helper.dart';
 import 'package:localsend_isolates/util/file_speed_helper.dart';
 import 'package:localsend_isolates/util/foreground_service.dart';
@@ -7,6 +9,13 @@ import 'package:localsend_isolates/util/transfer_progress_window.dart';
 /// A transfer only becomes fast enough to measure after a while; the first chunks are not
 /// representative. Same threshold as `ProgressPage`.
 const _minBytesForSpeed = 500 * 1024;
+
+/// How a transfer ended. Drives the text kept on screen until the window hides.
+enum TransferOutcome {
+  completed,
+  failed,
+  canceled,
+}
 
 /// Drives the single foreground service notification on behalf of all running transfers.
 ///
@@ -20,15 +29,29 @@ class TransferNotification {
   static final _transfers = <String, _Transfer>{};
   static NotificationStrings? _strings;
 
+  /// How long the Windows window keeps showing the completion state before hiding.
+  static Duration _completionDisplayDuration = const Duration(seconds: 3);
+  static Timer? _completionTimer;
+
   /// Injects the translated strings. Must be called before the first transfer starts.
   /// The locale is pinned on app start, so one call is enough.
-  static void init(NotificationStrings strings) {
+  static void init(
+    NotificationStrings strings, {
+    Duration completionDisplayDuration = const Duration(seconds: 3),
+  }) {
     _strings = strings;
+    _completionDisplayDuration = completionDisplayDuration;
+  }
+
+  /// Updates how long the native window keeps showing the completion state.
+  static void setCompletionDisplayDuration(Duration duration) {
+    _completionDisplayDuration = duration;
   }
 
   /// Only for tests: forgets every registered transfer.
   static void resetForTest() {
     _transfers.clear();
+    _cancelCompletionTimer();
   }
 
   /// Whether [update] would reach the notification, so that callers can skip summing up the
@@ -52,6 +75,7 @@ class TransferNotification {
     _transfers[sessionId] = _Transfer(receiving: receiving);
 
     if (isFirst) {
+      _cancelCompletionTimer();
       final snapshot = _snapshot();
       ForegroundService.start(
         channelName: _requiredStrings.titleReceiving,
@@ -91,19 +115,110 @@ class TransferNotification {
   }
 
   /// Unregisters a transfer, stopping the service once the last one is gone.
-  static void stop(String sessionId) {
-    if (_transfers.remove(sessionId) == null) {
+  ///
+  /// [outcome] keeps the Windows window visible for the configured duration and
+  /// shows the matching text instead of hiding it immediately. Without an outcome
+  /// (e.g. the user closing the progress page) the window hides right away.
+  static void stop(String sessionId, {TransferOutcome? outcome}) {
+    final transfer = _transfers.remove(sessionId);
+    if (transfer == null) {
       return;
     }
 
     if (_transfers.isEmpty) {
       ForegroundService.stop();
-      TransferProgressWindow.hide();
+      if (outcome != null) {
+        _showOutcome(transfer, outcome);
+      } else {
+        _cancelCompletionTimer();
+        TransferProgressWindow.hide();
+      }
     } else {
       final snapshot = _snapshot();
       ForegroundService.updateNotification(title: snapshot.title, text: snapshot.text, progress: snapshot.percentage);
       TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
     }
+  }
+
+  static void _showOutcome(_Transfer transfer, TransferOutcome outcome) {
+    _cancelCompletionTimer();
+
+    var remainingSeconds = _completionDisplayDuration.inSeconds;
+    if (remainingSeconds <= 0) {
+      TransferProgressWindow.hide();
+      return;
+    }
+
+    final title = _outcomeTitle(transfer, outcome);
+    final percentage = _outcomePercentage(transfer, outcome);
+    TransferProgressWindow.show(
+      title: title,
+      text: _outcomeText(transfer, outcome, remainingSeconds: remainingSeconds),
+      percentage: percentage,
+    );
+
+    _completionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      remainingSeconds--;
+      if (remainingSeconds <= 0) {
+        timer.cancel();
+        _completionTimer = null;
+        TransferProgressWindow.hide();
+        return;
+      }
+      TransferProgressWindow.update(
+        title: title,
+        text: _outcomeText(transfer, outcome, remainingSeconds: remainingSeconds),
+        percentage: percentage,
+      );
+    });
+  }
+
+  /// The outcome title keeps the file counter of a multi-file transfer.
+  static String _outcomeTitle(_Transfer transfer, TransferOutcome outcome) {
+    final strings = _requiredStrings;
+    final title = switch (outcome) {
+      TransferOutcome.completed => strings.titleCompleted,
+      TransferOutcome.failed => strings.titleFailed,
+      TransferOutcome.canceled => strings.titleCanceled,
+    };
+    final filesCount = transfer.totalFiles > 1 ? '${transfer.finishedFiles}/${transfer.totalFiles}' : null;
+    return filesCount != null ? '$title\u0001$filesCount' : title;
+  }
+
+  static int _outcomePercentage(_Transfer transfer, TransferOutcome outcome) {
+    if (outcome == TransferOutcome.completed) {
+      return 100;
+    }
+    return transfer.totalBytes == 0 ? 0 : (100 * transfer.currentBytes / transfer.totalBytes).floor();
+  }
+
+  /// The outcome body keeps the percentage and sizes, and replaces the remaining
+  /// time with the countdown until the window disappears.
+  static String _outcomeText(
+    _Transfer transfer,
+    TransferOutcome outcome, {
+    required int remainingSeconds,
+  }) {
+    final strings = _requiredStrings;
+    final percentage = _outcomePercentage(transfer, outcome);
+    final readableCurrent = transfer.currentBytes.asReadableFileSize;
+    final readableTotal = transfer.totalBytes.asReadableFileSize;
+    final text = StringBuffer('$percentage%\t$readableCurrent / $readableTotal');
+
+    final countdown = strings.completionCountdown(seconds: remainingSeconds);
+    final speed = transfer.speedInBytes;
+    if (speed != null) {
+      text.write('\n$countdown\t${speed.asReadableFileSize}/s');
+    } else {
+      text.write('\n$countdown');
+    }
+
+    return text.toString();
+  }
+
+  static void _cancelCompletionTimer() {
+    _completionTimer?.cancel();
+    _completionTimer = null;
   }
 
   /// The transfer speed in bytes per second, or null while it cannot be measured yet.

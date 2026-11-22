@@ -516,6 +516,18 @@ class Translations$progressPage$en {
   /// en: 'Receiving files'
   String get titleReceiving => 'Receiving files';
 
+  /// en: 'Transfer complete'
+  String get titleCompleted => 'Transfer complete';
+
+  /// en: 'Transfer failed'
+  String get titleFailed => 'Transfer failed';
+
+  /// en: 'Transfer canceled'
+  String get titleCanceled => 'Transfer canceled';
+
+  /// en: '{seconds}s left'
+  String completionCountdown({required Object seconds}) => '${seconds}s left';
+
   /// en: 'Saved in Photos'
   String get savedToGallery => 'Saved in Photos';
 
@@ -1100,6 +1112,19 @@ class Translations$settingsTab$general$en {
   /// en: 'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused and idle memory is returned to the system.'
   String get backgroundModeDescription =>
       'Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused and idle memory is returned to the system.';
+
+  /// en: 'Show tray icon'
+  String get showTrayIcon => 'Show tray icon';
+
+  /// en: 'When hidden, closing the window still keeps LocalSend running in the background. Launch LocalSend again to restore the window.'
+  String get showTrayIconDescription =>
+      'When hidden, closing the window still keeps LocalSend running in the background. Launch LocalSend again to restore the window.';
+
+  /// en: 'Transfer completion notification'
+  String get transferCompletedDuration => 'Transfer completion notification';
+
+  /// en: '{n} s'
+  String seconds({required Object n}) => '${n} s';
 
   /// en: 'Autostart after login'
   String get launchAtStartup => 'Autostart after login';

@@ -59,6 +59,7 @@ class TransferProgressWindow {
   void NotifyAction(const char* action);
   void StartShowAnimation();
   void StartHideAnimation();
+  void StartProgressAnimation();
   void ReleaseResources();
   int Scale(int value) const;
   int HeightForMode() const;
@@ -71,6 +72,7 @@ class TransferProgressWindow {
   std::wstring accept_label_;
   std::wstring decline_label_;
   double progress_ = 0.0;
+  double displayed_progress_ = 0.0;  // animated toward progress_ for smooth updates
   UINT dpi_ = 96;
   bool user_positioned_ = false;
   bool dark_ = false;

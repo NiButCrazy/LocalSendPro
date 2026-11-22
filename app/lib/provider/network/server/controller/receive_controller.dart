@@ -433,10 +433,13 @@ class ReceiveController {
 
     final statuses = server.ref.read(fileTransferProvider).getStatuses(session.sessionId);
     if (allowedStates.contains(session.status) && statuses.isFinishedOrError) {
-      // The transfer is over, the process no longer needs to be kept alive for it.
-      TransferNotification.stop(session.sessionId);
-
       final hasError = statuses.any((status) => status == FileStatus.failed);
+
+      // The transfer is over, the process no longer needs to be kept alive for it.
+      TransferNotification.stop(
+        session.sessionId,
+        outcome: hasError ? TransferOutcome.failed : TransferOutcome.completed,
+      );
       server.setState(
         (oldState) => oldState?.copyWith(
           session: oldState.session!.copyWith(
@@ -796,7 +799,7 @@ void _cancelBySender(ServerUtils server) {
     return;
   }
 
-  TransferNotification.stop(receiveSession.sessionId);
+  TransferNotification.stop(receiveSession.sessionId, outcome: TransferOutcome.canceled);
 
   if (receiveSession.status == SessionStatus.waiting) {
     // received cancel during accept/decline

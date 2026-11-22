@@ -453,6 +453,14 @@ class Translations$progressPage$zh_CN extends Translations$progressPage$en {
   @override
   String get titleReceiving => '正在接收文件';
   @override
+  String get titleCompleted => '传输完成';
+  @override
+  String get titleFailed => '传输失败';
+  @override
+  String get titleCanceled => '传输已取消';
+  @override
+  String completionCountdown({required Object seconds}) => '${seconds} 秒后消失';
+  @override
   String get savedToGallery => '已保存到相册';
   @override
   late final Translations$progressPage$total$zh_CN total = Translations$progressPage$total$zh_CN.internal(_root);
@@ -961,6 +969,14 @@ class Translations$settingsTab$general$zh_CN extends Translations$settingsTab$ge
   String get backgroundMode => '轻量后台模式';
   @override
   String get backgroundModeDescription => '关闭窗口后驻留系统托盘，继续设备发现与文件接收，同时暂停界面渲染并回收闲置内存。';
+  @override
+  String get showTrayIcon => '显示托盘图标';
+  @override
+  String get showTrayIconDescription => '隐藏后关闭窗口仍会在后台运行，再次启动 LocalSend 即可恢复窗口。';
+  @override
+  String get transferCompletedDuration => '传输完成通知停留时长';
+  @override
+  String seconds({required Object n}) => '${n} 秒';
   @override
   String get launchAtStartup => '登录系统后自动启动程序';
   @override

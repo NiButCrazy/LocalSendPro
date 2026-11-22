@@ -20,7 +20,12 @@ constexpr UINT_PTR kAnimationTimerId = 1;
 constexpr int kAnimationIntervalMs = 15;
 constexpr int kAnimationDurationMs = 180;
 constexpr int kAnimationSlide = 10;  // logical pixels
-constexpr BYTE kWindowAlpha = 242;   // ~95% opacity
+constexpr BYTE kWindowAlpha = 255;   // fully opaque
+
+// Smooths the progress bar between the throttled updates from the Dart side.
+constexpr UINT_PTR kProgressTimerId = 2;
+constexpr int kProgressIntervalMs = 16;
+constexpr double kProgressEase = 0.25;
 
 double EaseOutCubic(double t) {
   const double remaining = 1.0 - t;
@@ -151,11 +156,15 @@ void TransferProgressWindow::ShowWaiting(const std::string& title,
 }
 
 void TransferProgressWindow::Hide() {
+  if (hwnd_) {
+    KillTimer(hwnd_, kProgressTimerId);
+  }
   StartHideAnimation();
 }
 
 void TransferProgressWindow::Destroy() {
   if (hwnd_) {
+    KillTimer(hwnd_, kProgressTimerId);
     HWND window = hwnd_;
     hwnd_ = nullptr;
     DestroyWindow(window);
@@ -215,8 +224,13 @@ void TransferProgressWindow::SetContent(const std::string& title,
     start = end + 1;
   }
   progress_ = std::clamp(progress, 0.0, 1.0);
+  if (progress_ < displayed_progress_) {
+    // A new transfer restarts from zero; jump back instead of sliding backwards.
+    displayed_progress_ = progress_;
+  }
   UpdateLayoutMetrics();
   if (hwnd_) {
+    StartProgressAnimation();
     InvalidateRect(hwnd_, nullptr, FALSE);
   }
 }
@@ -419,7 +433,8 @@ void TransferProgressWindow::PaintProgress(HDC dc, int width, int height) {
   RoundRect(dc, text_left, track_top, text_right, track_bottom, Scale(3),
             Scale(3));
 
-  const int fill_right = text_left + static_cast<int>((text_right - text_left) * progress_);
+  const int fill_right =
+      text_left + static_cast<int>((text_right - text_left) * displayed_progress_);
   if (fill_right > text_left) {
     SelectObject(dc, fill_brush_);
     RoundRect(dc, text_left, track_top, fill_right, track_bottom, Scale(3),
@@ -589,6 +604,20 @@ void TransferProgressWindow::NotifyAction(const char* action) {
   }
 }
 
+void TransferProgressWindow::StartProgressAnimation() {
+  if (!hwnd_) {
+    return;
+  }
+  if (!IsWindowVisible(hwnd_) ||
+      std::abs(progress_ - displayed_progress_) < 0.001) {
+    // Jump to the target while the window is still hidden, so the fade-in does
+    // not start from a stale value.
+    displayed_progress_ = progress_;
+    return;
+  }
+  SetTimer(hwnd_, kProgressTimerId, kProgressIntervalMs, nullptr);
+}
+
 void TransferProgressWindow::StartShowAnimation() {
   if (!hwnd_) {
     return;
@@ -722,6 +751,17 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
     case WM_ERASEBKGND:
       return 1;
     case WM_TIMER:
+      if (wparam == kProgressTimerId) {
+        const double delta = progress_ - displayed_progress_;
+        if (std::abs(delta) < 0.005) {
+          displayed_progress_ = progress_;
+          KillTimer(window, kProgressTimerId);
+        } else {
+          displayed_progress_ += delta * kProgressEase;
+        }
+        InvalidateRect(window, nullptr, FALSE);
+        return 0;
+      }
       if (wparam == kAnimationTimerId) {
         animation_step_++;
         const int elapsed = animation_step_ * kAnimationIntervalMs;

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/config/theme.dart';
@@ -18,6 +20,7 @@ import 'package:localsend_app/util/native/device_info_helper.dart';
 import 'package:localsend_app/util/native/macos_channel.dart';
 import 'package:localsend_app/util/native/pick_directory_path.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
+import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/widget/custom_dropdown_button.dart';
 import 'package:localsend_app/widget/dialogs/encryption_disabled_notice.dart';
 import 'package:localsend_app/widget/dialogs/pin_dialog.dart';
@@ -137,6 +140,32 @@ class SettingsTab extends StatelessWidget {
                         await ref.notifier(settingsProvider).setBackgroundMode(b);
                       },
                     ),
+                    if (checkPlatform([TargetPlatform.windows]))
+                      _BooleanEntry(
+                        label: t.settingsTab.general.showTrayIcon,
+                        description: t.settingsTab.general.showTrayIconDescription,
+                        value: vm.settings.showTrayIcon,
+                        onChanged: (b) async {
+                          await ref.notifier(settingsProvider).setShowTrayIcon(b);
+                        },
+                      ),
+                    if (checkPlatform([TargetPlatform.windows]))
+                      _SettingsEntry(
+                        label: t.settingsTab.general.transferCompletedDuration,
+                        child: CustomDropdownButton<int>(
+                          value: vm.settings.transferCompletedDuration,
+                          items: const [0, 1, 3, 5, 10, 30].map((seconds) {
+                            return DropdownMenuItem(
+                              value: seconds,
+                              alignment: Alignment.center,
+                              child: Text(t.settingsTab.general.seconds(n: seconds)),
+                            );
+                          }).toList(),
+                          onChanged: (seconds) async {
+                            await ref.notifier(settingsProvider).setTransferCompletedDuration(seconds);
+                          },
+                        ),
+                      ),
                   ],
                   if (checkPlatformIsDesktop()) ...[
                     _BooleanEntry(
@@ -630,6 +659,20 @@ class SettingsTab extends StatelessWidget {
                 label: Text(t.changelogPage.title),
               ),
             ),
+            if (checkPlatform([TargetPlatform.windows]) && !vm.settings.showTrayIcon)
+              Center(
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () async {
+                    await destroyTray();
+                    exit(0);
+                  },
+                  icon: const Icon(Icons.power_settings_new),
+                  label: Text(t.tray.close),
+                ),
+              ),
             const SizedBox(height: 80),
           ],
         );

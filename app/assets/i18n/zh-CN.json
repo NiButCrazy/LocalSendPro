@@ -112,6 +112,10 @@
       "minimizeToTray": "关闭时最小化到系统托盘",
       "backgroundMode": "轻量后台模式",
       "backgroundModeDescription": "关闭窗口后驻留系统托盘，继续设备发现与文件接收，同时暂停界面渲染并回收闲置内存。",
+      "showTrayIcon": "显示托盘图标",
+      "showTrayIconDescription": "隐藏后关闭窗口仍会在后台运行，再次启动 LocalSend 即可恢复窗口。",
+      "transferCompletedDuration": "传输完成通知停留时长",
+      "seconds": "{n} 秒",
       "launchAtStartup": "登录系统后自动启动程序",
       "launchMinimized": "自动启动时隐藏窗口",
       "showInContextMenu": "在“发送到...”文件菜单中显示 LocalSend",
@@ -260,6 +264,10 @@
   "progressPage": {
     "titleSending": "正在发送文件",
     "titleReceiving": "正在接收文件",
+    "titleCompleted": "传输完成",
+    "titleFailed": "传输失败",
+    "titleCanceled": "传输已取消",
+    "completionCountdown": "{seconds} 秒后消失",
     "savedToGallery": "已保存到相册",
     "total": {
       "title": {

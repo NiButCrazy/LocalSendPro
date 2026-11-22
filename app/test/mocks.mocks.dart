@@ -675,6 +675,42 @@ class MockPersistenceService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
+  bool isShowTrayIcon() =>
+      (super.noSuchMethod(
+            Invocation.method(#isShowTrayIcon, []),
+            returnValue: false,
+            returnValueForMissingStub: false,
+          )
+          as bool);
+
+  @override
+  _i5.Future<void> setShowTrayIcon(bool? showTrayIcon) =>
+      (super.noSuchMethod(
+            Invocation.method(#setShowTrayIcon, [showTrayIcon]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  int getTransferCompletedDuration() =>
+      (super.noSuchMethod(
+            Invocation.method(#getTransferCompletedDuration, []),
+            returnValue: 0,
+            returnValueForMissingStub: 0,
+          )
+          as int);
+
+  @override
+  _i5.Future<void> setTransferCompletedDuration(int? seconds) =>
+      (super.noSuchMethod(
+            Invocation.method(#setTransferCompletedDuration, [seconds]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
   bool getAlwaysOnTop() =>
       (super.noSuchMethod(
             Invocation.method(#getAlwaysOnTop, []),

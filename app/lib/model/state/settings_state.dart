@@ -28,6 +28,8 @@ class SettingsState with SettingsStateMappable {
   final bool autoFinish; // automatically finish sessions
   final bool minimizeToTray; // minimize to tray instead of exiting the app
   final bool backgroundMode; // keep running in the tray and pause UI rendering while hidden
+  final bool showTrayIcon; // show the system tray icon (Windows)
+  final int transferCompletedDuration; // seconds the transfer completion window stays visible (Windows)
   final bool https;
   final SendMode sendMode;
   final bool saveWindowPlacement;
@@ -63,6 +65,8 @@ class SettingsState with SettingsStateMappable {
     required this.autoFinish,
     required this.minimizeToTray,
     required this.backgroundMode,
+    required this.showTrayIcon,
+    required this.transferCompletedDuration,
     required this.https,
     required this.sendMode,
     required this.saveWindowPlacement,

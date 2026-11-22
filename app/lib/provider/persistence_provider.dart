@@ -66,6 +66,8 @@ const _windowHeight = 'ls_window_height';
 const _saveWindowPlacement = 'ls_save_window_placement';
 const _alwaysOnTop = 'ls_always_on_top';
 const _framelessWindow = 'ls_frameless_window';
+const _showTrayIcon = 'ls_show_tray_icon';
+const _transferCompletedDuration = 'ls_transfer_completed_duration';
 
 // Settings
 const _showToken = 'ls_show_token';
@@ -580,6 +582,22 @@ class PersistenceService {
 
   Future<void> setFramelessWindow(bool framelessWindow) async {
     await _prefs.setBool(_framelessWindow, framelessWindow);
+  }
+
+  bool isShowTrayIcon() {
+    return _prefs.getBool(_showTrayIcon) ?? true;
+  }
+
+  Future<void> setShowTrayIcon(bool showTrayIcon) async {
+    await _prefs.setBool(_showTrayIcon, showTrayIcon);
+  }
+
+  int getTransferCompletedDuration() {
+    return (_prefs.getInt(_transferCompletedDuration) ?? 3).clamp(0, 60);
+  }
+
+  Future<void> setTransferCompletedDuration(int seconds) async {
+    await _prefs.setInt(_transferCompletedDuration, seconds.clamp(0, 60));
   }
 
   bool getAlwaysOnTop() {

@@ -8,9 +8,11 @@ import 'package:localsend_app/model/state/settings_state.dart';
 import 'package:localsend_app/provider/persistence_provider.dart';
 import 'package:localsend_app/provider/window_dimensions_provider.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
+import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/util/native/window_helper.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
+import 'package:localsend_isolates/util/transfer_notification.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:window_manager/window_manager.dart';
@@ -70,6 +72,8 @@ class SettingsService extends PureNotifier<SettingsState> {
     autoFinish: _persistence.isAutoFinish(),
     minimizeToTray: _persistence.isMinimizeToTray(),
     backgroundMode: _persistence.isBackgroundMode(),
+    showTrayIcon: _persistence.isShowTrayIcon(),
+    transferCompletedDuration: _persistence.getTransferCompletedDuration(),
     https: _persistence.isHttps(),
     sendMode: _persistence.getSendMode(),
     saveWindowPlacement: _persistence.getSaveWindowPlacement(),
@@ -292,6 +296,37 @@ class SettingsService extends PureNotifier<SettingsState> {
 
     await _persistence.setFramelessWindow(framelessWindow);
     state = state.copyWith(framelessWindow: framelessWindow);
+  }
+
+  Future<void> setShowTrayIcon(bool showTrayIcon) async {
+    if (state.showTrayIcon == showTrayIcon) {
+      return;
+    }
+
+    try {
+      if (showTrayIcon) {
+        await initTray();
+      } else {
+        await destroyTray();
+      }
+    } catch (e) {
+      _logger.warning('Failed to update the tray icon visibility', e);
+      return;
+    }
+
+    await _persistence.setShowTrayIcon(showTrayIcon);
+    state = state.copyWith(showTrayIcon: showTrayIcon);
+  }
+
+  Future<void> setTransferCompletedDuration(int seconds) async {
+    final value = seconds.clamp(0, 60);
+    if (state.transferCompletedDuration == value) {
+      return;
+    }
+
+    await _persistence.setTransferCompletedDuration(value);
+    state = state.copyWith(transferCompletedDuration: value);
+    TransferNotification.setCompletionDisplayDuration(Duration(seconds: value));
   }
 
   Future<void> setEnableAnimations(bool enableAnimations) async {

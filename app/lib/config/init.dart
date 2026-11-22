@@ -96,7 +96,10 @@ Future<RefenaContainer> preInit(List<String> args) async {
 
   await initI18n();
 
-  TransferNotification.init(notificationStrings);
+  TransferNotification.init(
+    notificationStrings,
+    completionDisplayDuration: Duration(seconds: persistenceService.getTransferCompletedDuration()),
+  );
 
   bool startHidden = false;
   if (checkPlatformIsDesktop()) {
@@ -116,7 +119,9 @@ Future<RefenaContainer> preInit(List<String> args) async {
 
     // initialize tray AFTER i18n has been initialized
     try {
-      await initTray();
+      if (persistenceService.isShowTrayIcon()) {
+        await initTray();
+      }
     } catch (e) {
       _logger.warning('Initializing tray failed: $e');
     }

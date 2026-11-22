@@ -517,13 +517,17 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
       return;
     }
 
+    final hasError = ref.read(fileTransferProvider).getStatuses(sessionId).any((status) => status == FileStatus.failed);
+    final outcome = sessionState.status != SessionStatus.sending
+        ? TransferOutcome.canceled
+        : (hasError ? TransferOutcome.failed : TransferOutcome.completed);
+
     // The transfer is over, the process no longer needs to be kept alive for it.
-    TransferNotification.stop(sessionId);
+    TransferNotification.stop(sessionId, outcome: outcome);
 
     if (state[sessionId]!.status != SessionStatus.sending) {
       _logger.info('Transfer was canceled.');
     } else {
-      final hasError = ref.read(fileTransferProvider).getStatuses(sessionId).any((status) => status == FileStatus.failed);
       if (!hasError && sessionState.background == true) {
         // close session because everything is fine and it is in background
         closeSession(sessionId);
@@ -756,7 +760,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     if (sessionState == null) {
       return;
     }
-    TransferNotification.stop(sessionId);
+    TransferNotification.stop(sessionId, outcome: TransferOutcome.canceled);
     _cancelRunningRequests(sessionState);
 
     state = state.updateSession(
