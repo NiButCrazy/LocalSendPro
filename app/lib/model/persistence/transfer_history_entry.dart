@@ -3,10 +3,14 @@ import 'package:flutter/widgets.dart';
 import 'package:localsend_app/util/system_date_time_formatter.dart';
 import 'package:localsend_isolates/model/file_type.dart';
 
-part 'receive_history_entry.mapper.dart';
+part 'transfer_history_entry.mapper.dart';
+
+/// The direction of a transfer.
+@MappableEnum()
+enum TransferDirection { receive, send }
 
 @MappableClass()
-class ReceiveHistoryEntry with ReceiveHistoryEntryMappable {
+class TransferHistoryEntry with TransferHistoryEntryMappable {
   final String id;
 
   /// The name of the file.
@@ -21,10 +25,17 @@ class ReceiveHistoryEntry with ReceiveHistoryEntryMappable {
   final bool isMessage;
 
   final int fileSize;
+
+  /// The alias of the other device: the sender for received files,
+  /// the recipient for sent files.
   final String senderAlias;
+
   final DateTime timestamp;
 
-  const ReceiveHistoryEntry({
+  @MappableField(hook: DirectionHook())
+  final TransferDirection direction;
+
+  const TransferHistoryEntry({
     required this.id,
     required this.fileName,
     required this.fileType,
@@ -34,6 +45,7 @@ class ReceiveHistoryEntry with ReceiveHistoryEntryMappable {
     required this.fileSize,
     required this.senderAlias,
     required this.timestamp,
+    required this.direction,
   });
 
   /// Format string using the system date and time format.
@@ -42,7 +54,7 @@ class ReceiveHistoryEntry with ReceiveHistoryEntryMappable {
     return SystemDateTimeFormatter.dateTime(context, timestamp.toLocal());
   }
 
-  static const fromJson = ReceiveHistoryEntryMapper.fromJson;
+  static const fromJson = TransferHistoryEntryMapper.fromJson;
 }
 
 class IsMessageHook extends MappingHook {
@@ -51,5 +63,18 @@ class IsMessageHook extends MappingHook {
   @override
   Object? beforeDecode(Object? value) {
     return value == true;
+  }
+}
+
+class DirectionHook extends MappingHook {
+  const DirectionHook();
+
+  @override
+  Object? beforeDecode(Object? value) {
+    // 旧版本没有 direction 字段，全部是接收记录。
+    if (value == null) {
+      return TransferDirection.receive;
+    }
+    return value;
   }
 }

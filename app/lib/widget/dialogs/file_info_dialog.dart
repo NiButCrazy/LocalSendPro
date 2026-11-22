@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
-import 'package:localsend_app/model/persistence/receive_history_entry.dart';
+import 'package:localsend_app/model/persistence/transfer_history_entry.dart';
 import 'package:localsend_isolates/util/file_size_helper.dart';
 import 'package:routerino/routerino.dart';
 
 class FileInfoDialog extends StatelessWidget {
-  final ReceiveHistoryEntry entry;
+  final TransferHistoryEntry entry;
 
   const FileInfoDialog({required this.entry, super.key});
 
@@ -53,7 +53,7 @@ class FileInfoDialog extends StatelessWidget {
                   ),
                   TableRow(
                     children: [
-                      Text(t.dialogs.fileInfo.sender),
+                      Text(entry.direction == TransferDirection.send ? t.dialogs.fileInfo.recipient : t.dialogs.fileInfo.sender),
                       const SizedBox(width: 10),
                       SelectableText(entry.senderAlias),
                     ],

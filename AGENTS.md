@@ -49,6 +49,8 @@ fvm dart run slang               # i18n codegen (slang_build_runner is disabled 
 fvm flutter run
 ```
 
+Prefer **hot reload** (`r`) for every Dart/UI change, including regenerated Dart (slang / build_runner output) that only changes app code. Avoid `R` hot restart: with the Rust/FRB bridge it has ended in `Lost connection to device` here. Relaunch the process only for native/Rust code, bundled assets, or when a reload cannot apply.
+
 Checks (what CI runs):
 
 ```bash

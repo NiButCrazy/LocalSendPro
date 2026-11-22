@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/model/cross_file.dart';
+import 'package:localsend_app/model/persistence/transfer_history_entry.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/model/state/send/send_session_state.dart';
 import 'package:localsend_app/model/state/send/sending_file.dart';
@@ -14,6 +15,7 @@ import 'package:localsend_app/provider/file_transfer_provider.dart';
 import 'package:localsend_app/provider/http_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/provider/transfer_history_provider.dart';
 import 'package:localsend_app/widget/dialogs/pin_dialog.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
@@ -694,9 +696,11 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                 );
             _updateForegroundServiceProgress(sessionId);
             ref.notifier(fileTransferProvider).setStatus(sessionId: sessionId, fileId: event.fileId, status: FileStatus.finished);
+            _recordSentFile(sessionId, event.fileId);
           case HttpUploadFileFailedEvent():
             _logger.warning('Error while sending file ${state[sessionId]?.files[event.fileId]?.file.fileName}: ${event.error}');
             ref.notifier(fileTransferProvider).setStatus(sessionId: sessionId, fileId: event.fileId, status: FileStatus.failed);
+            _recordSentFile(sessionId, event.fileId);
             state = state.updateSession(
               sessionId: sessionId,
               state: (s) => s?.withFileError(event.fileId, event.error),
@@ -735,6 +739,32 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
         ),
       );
     }
+  }
+
+  /// Records a sent file in the transfer history.
+  /// Both finished and failed files are recorded; the history tracks the attempt.
+  void _recordSentFile(String sessionId, String fileId) {
+    final session = state[sessionId];
+    final sendingFile = session?.files[fileId];
+    if (session == null || sendingFile == null) {
+      return;
+    }
+
+    // FileDto.id 只在会话内唯一，运行层/持久层都靠这个 id 去重。
+    final entry = TransferHistoryEntry(
+      id: 'send:$sessionId:$fileId',
+      fileName: sendingFile.file.fileName,
+      fileType: sendingFile.file.fileType,
+      path: sendingFile.path,
+      savedToGallery: false,
+      isMessage: false,
+      fileSize: sendingFile.file.size,
+      senderAlias: session.target.alias,
+      timestamp: DateTime.now().toUtc(),
+      direction: TransferDirection.send,
+    );
+    // 历史落盘是异步的，不阻塞发送事件循环。
+    unawaited(ref.redux(transferHistoryProvider).dispatchAsync(RecordHistoryEntryAction(entry)));
   }
 
   /// Closes the send-session and sends a cancel event to the receiver.

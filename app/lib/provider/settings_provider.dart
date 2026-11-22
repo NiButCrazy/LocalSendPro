@@ -2,6 +2,8 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/color_mode.dart';
+import 'package:localsend_app/model/persistence/history_direction_filter.dart';
+import 'package:localsend_app/model/persistence/history_layer.dart';
 import 'package:localsend_app/model/persistence/quick_save_mode.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/model/state/settings_state.dart';
@@ -66,6 +68,9 @@ class SettingsService extends PureNotifier<SettingsState> {
     destination: _persistence.getDestination(),
     saveToGallery: _persistence.isSaveToGallery(),
     saveToHistory: _persistence.isSaveToHistory(),
+    historyLimit: _persistence.getHistoryLimit(),
+    historyDefaultFilter: _persistence.getHistoryDefaultFilter(),
+    historyDefaultLayer: _persistence.getHistoryDefaultLayer(),
     quickSave: _persistence.getQuickSave() == QuickSaveMode.on,
     quickSaveFromFavorites: _persistence.getQuickSave() == QuickSaveMode.paired,
     receivePin: _persistence.getReceivePin(),
@@ -186,6 +191,31 @@ class SettingsService extends PureNotifier<SettingsState> {
     state = state.copyWith(
       saveToHistory: saveToHistory,
     );
+  }
+
+  Future<void> setHistoryLimit(int value) async {
+    final limit = value.clamp(0, 10000);
+    if (state.historyLimit == limit) {
+      return;
+    }
+    await _persistence.setHistoryLimit(limit);
+    state = state.copyWith(historyLimit: limit);
+  }
+
+  Future<void> setHistoryDefaultFilter(HistoryDirectionFilter filter) async {
+    if (state.historyDefaultFilter == filter) {
+      return;
+    }
+    await _persistence.setHistoryDefaultFilter(filter);
+    state = state.copyWith(historyDefaultFilter: filter);
+  }
+
+  Future<void> setHistoryDefaultLayer(HistoryLayer layer) async {
+    if (state.historyDefaultLayer == layer) {
+      return;
+    }
+    await _persistence.setHistoryDefaultLayer(layer);
+    state = state.copyWith(historyDefaultLayer: layer);
   }
 
   Future<void> setQuickSave(bool quickSave) async {

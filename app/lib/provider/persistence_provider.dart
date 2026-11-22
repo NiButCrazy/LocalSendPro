@@ -7,8 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/color_mode.dart';
 import 'package:localsend_app/model/persistence/favorite_device.dart';
+import 'package:localsend_app/model/persistence/history_direction_filter.dart';
+import 'package:localsend_app/model/persistence/history_layer.dart';
 import 'package:localsend_app/model/persistence/quick_save_mode.dart';
-import 'package:localsend_app/model/persistence/receive_history_entry.dart';
+import 'package:localsend_app/model/persistence/transfer_history_entry.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_app/provider/window_dimensions_provider.dart';
 import 'package:localsend_app/util/alias_generator.dart';
@@ -52,8 +54,12 @@ const _securityContext = 'ls_security_context';
 const _signalingServers = 'ls_signaling_servers';
 const _stunServers = 'ls_stun_servers';
 
-// Received file history
+// Transfer history
+// 键名保持不变，旧版本的接收记录会自动成为「全部时间」层的数据。
 const _receiveHistory = 'ls_receive_history';
+const _historyLimit = 'ls_history_limit'; // 0 = unlimited
+const _historyDefaultFilter = 'ls_history_default_filter';
+const _historyDefaultLayer = 'ls_history_default_layer';
 
 // Favorites
 const _favorites = 'ls_favorites';
@@ -259,14 +265,41 @@ class PersistenceService {
     await _prefs.setString(_stunServers, jsonEncode(servers));
   }
 
-  List<ReceiveHistoryEntry> getReceiveHistory() {
+  List<TransferHistoryEntry> getTransferHistory() {
     final historyRaw = _prefs.getStringList(_receiveHistory) ?? [];
-    return historyRaw.map((entry) => ReceiveHistoryEntry.fromJson(jsonDecode(entry))).toList();
+    return historyRaw.map((entry) => TransferHistoryEntry.fromJson(jsonDecode(entry))).toList();
   }
 
-  Future<void> setReceiveHistory(List<ReceiveHistoryEntry> entries) async {
+  Future<void> setTransferHistory(List<TransferHistoryEntry> entries) async {
     final historyRaw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
     await _prefs.setStringList(_receiveHistory, historyRaw);
+  }
+
+  /// The number of entries kept in the persistent history. `0` means unlimited.
+  int getHistoryLimit() {
+    return (_prefs.getInt(_historyLimit) ?? 0).clamp(0, 10000);
+  }
+
+  Future<void> setHistoryLimit(int limit) async {
+    await _prefs.setInt(_historyLimit, limit.clamp(0, 10000));
+  }
+
+  HistoryDirectionFilter getHistoryDefaultFilter() {
+    final value = _prefs.getString(_historyDefaultFilter);
+    return HistoryDirectionFilter.values.firstWhereOrNull((filter) => filter.name == value) ?? HistoryDirectionFilter.all;
+  }
+
+  Future<void> setHistoryDefaultFilter(HistoryDirectionFilter filter) async {
+    await _prefs.setString(_historyDefaultFilter, filter.name);
+  }
+
+  HistoryLayer getHistoryDefaultLayer() {
+    final value = _prefs.getString(_historyDefaultLayer);
+    return HistoryLayer.values.firstWhereOrNull((layer) => layer.name == value) ?? HistoryLayer.runtime;
+  }
+
+  Future<void> setHistoryDefaultLayer(HistoryLayer layer) async {
+    await _prefs.setString(_historyDefaultLayer, layer.name);
   }
 
   List<FavoriteDevice> getFavorites() {

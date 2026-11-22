@@ -3,7 +3,6 @@ import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/state/server/server_state.dart';
 import 'package:localsend_app/pages/home_page.dart';
 import 'package:localsend_app/pages/home_page_controller.dart';
-import 'package:localsend_app/pages/receive_history_page.dart';
 import 'package:localsend_app/pages/web_share_page.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
 import 'package:localsend_app/provider/local_ip_provider.dart';
@@ -16,10 +15,8 @@ import 'package:localsend_app/widget/custom_icon_button.dart';
 import 'package:localsend_app/widget/local_send_logo.dart';
 import 'package:localsend_app/widget/responsive_list_view.dart';
 import 'package:localsend_app/widget/rotating_widget.dart';
-import 'package:localsend_isolates/util/sleep.dart';
 import 'package:refena_flutter/addons.dart';
 import 'package:refena_flutter/refena_flutter.dart';
-import 'package:routerino/routerino.dart';
 
 class ReceiveTab extends StatefulWidget {
   const ReceiveTab();
@@ -32,23 +29,8 @@ class _ReceiveTabState extends State<ReceiveTab> {
   /// Whether the advanced network info is shown
   bool _showAdvanced = false;
 
-  /// Whether the history button is shown
-  /// This extra boolean is needed to delay the animation
-  bool _showHistoryButton = true;
-
   Future<void> _toggleAdvanced() async {
-    if (_showAdvanced) {
-      setState(() => _showAdvanced = false);
-      await sleepAsync(200);
-      if (mounted) {
-        setState(() => _showHistoryButton = true);
-      }
-    } else {
-      setState(() {
-        _showAdvanced = true;
-        _showHistoryButton = false;
-      });
-    }
+    setState(() => _showAdvanced = !_showAdvanced);
   }
 
   @override
@@ -126,8 +108,6 @@ class _ReceiveTabState extends State<ReceiveTab> {
           showAdvanced: _showAdvanced,
         ),
         _CornerButtons(
-          showAdvanced: _showAdvanced,
-          showHistoryButton: _showHistoryButton,
           toggleAdvanced: _toggleAdvanced,
         ),
       ],
@@ -136,13 +116,9 @@ class _ReceiveTabState extends State<ReceiveTab> {
 }
 
 class _CornerButtons extends StatelessWidget {
-  final bool showAdvanced;
-  final bool showHistoryButton;
   final Future<void> Function() toggleAdvanced;
 
   const _CornerButtons({
-    required this.showAdvanced,
-    required this.showHistoryButton,
     required this.toggleAdvanced,
   });
 
@@ -152,26 +128,10 @@ class _CornerButtons extends StatelessWidget {
       alignment: Alignment.topRight,
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            if (!showAdvanced)
-              AnimatedOpacity(
-                opacity: showHistoryButton ? 1 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: CustomIconButton(
-                  onPressed: () async {
-                    await context.push(() => const ReceiveHistoryPage());
-                  },
-                  child: const Icon(Icons.history),
-                ),
-              ),
-            CustomIconButton(
-              key: const ValueKey('info-btn'),
-              onPressed: toggleAdvanced,
-              child: const Icon(Icons.info),
-            ),
-          ],
+        child: CustomIconButton(
+          key: const ValueKey('info-btn'),
+          onPressed: toggleAdvanced,
+          child: const Icon(Icons.info),
         ),
       ),
     );

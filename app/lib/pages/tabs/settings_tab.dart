@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:localsend_app/config/theme.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/color_mode.dart';
+import 'package:localsend_app/model/persistence/history_direction_filter.dart';
+import 'package:localsend_app/model/persistence/history_layer.dart';
 import 'package:localsend_app/pages/about/about_page.dart';
 import 'package:localsend_app/pages/changelog_page.dart';
 import 'package:localsend_app/pages/donation/donation_page.dart';
@@ -12,6 +14,7 @@ import 'package:localsend_app/pages/settings/network_interfaces_page.dart';
 import 'package:localsend_app/pages/tabs/settings_tab_controller.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/provider/transfer_history_provider.dart';
 import 'package:localsend_app/provider/version_provider.dart';
 import 'package:localsend_app/provider/window_dimensions_provider.dart';
 import 'package:localsend_app/util/alias_generator.dart';
@@ -320,6 +323,63 @@ class SettingsTab extends StatelessWidget {
                   onChanged: (b) async {
                     await ref.notifier(settingsProvider).setSaveToHistory(b);
                   },
+                ),
+                _SettingsEntry(
+                  label: t.settingsTab.receive.historyLimit,
+                  child: CustomDropdownButton<int>(
+                    value: vm.settings.historyLimit,
+                    items: const [0, 50, 100, 200, 500].map((limit) {
+                      return DropdownMenuItem(
+                        value: limit,
+                        alignment: Alignment.center,
+                        child: Text(
+                          limit == 0 ? t.settingsTab.receive.historyLimitUnlimited : t.settingsTab.receive.historyLimitCount(n: limit),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (limit) async {
+                      await ref.notifier(settingsProvider).setHistoryLimit(limit);
+                      await ref.redux(transferHistoryProvider).dispatchAsync(TrimHistoryAction(limit));
+                    },
+                  ),
+                ),
+                _SettingsEntry(
+                  label: t.settingsTab.receive.historyDefaultFilter,
+                  child: CustomDropdownButton<HistoryDirectionFilter>(
+                    value: vm.settings.historyDefaultFilter,
+                    items: HistoryDirectionFilter.values.map((filter) {
+                      return DropdownMenuItem(
+                        value: filter,
+                        alignment: Alignment.center,
+                        child: Text(switch (filter) {
+                          HistoryDirectionFilter.all => t.receiveHistoryPage.filters.all,
+                          HistoryDirectionFilter.receive => t.receiveHistoryPage.filters.receive,
+                          HistoryDirectionFilter.send => t.receiveHistoryPage.filters.send,
+                        }),
+                      );
+                    }).toList(),
+                    onChanged: (filter) async {
+                      await ref.notifier(settingsProvider).setHistoryDefaultFilter(filter);
+                    },
+                  ),
+                ),
+                _SettingsEntry(
+                  label: t.settingsTab.receive.historyDefaultLayer,
+                  child: CustomDropdownButton<HistoryLayer>(
+                    value: vm.settings.historyDefaultLayer,
+                    items: HistoryLayer.values.map((layer) {
+                      return DropdownMenuItem(
+                        value: layer,
+                        alignment: Alignment.center,
+                        child: Text(
+                          layer == HistoryLayer.runtime ? t.receiveHistoryPage.segments.runtime : t.receiveHistoryPage.segments.persistent,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (layer) async {
+                      await ref.notifier(settingsProvider).setHistoryDefaultLayer(layer);
+                    },
+                  ),
                 ),
                 if (vm.advanced)
                   _BooleanEntry(

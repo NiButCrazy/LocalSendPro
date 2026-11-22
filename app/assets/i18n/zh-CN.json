@@ -132,6 +132,11 @@
       "downloads": "(下载)",
       "saveToGallery": "保存到相册",
       "saveToHistory": "保存到历史记录",
+      "historyLimit": "历史记录条数",
+      "historyLimitUnlimited": "不限",
+      "historyLimitCount": "{n} 条",
+      "historyDefaultFilter": "默认历史过滤",
+      "historyDefaultLayer": "默认历史范围",
       "verifyChecksums": "接收后校验文件完整性"
     },
     "send": {
@@ -200,6 +205,18 @@
     "openFolder": "打开目录",
     "deleteHistory": "删除历史记录",
     "empty": "无历史记录。",
+    "clearRuntime": "清空本次运行",
+    "sentTo": "发送到 {alias}",
+    "receivedFrom": "来自 {alias}",
+    "segments": {
+      "runtime": "本次运行",
+      "persistent": "全部时间"
+    },
+    "filters": {
+      "all": "全部",
+      "receive": "接收",
+      "send": "发送"
+    },
     "entryActions": {
       "open": "打开文件",
       "showInFolder": "在文件管理器中显示",
@@ -472,6 +489,7 @@
       "path": "路径：",
       "size": "大小：",
       "sender": "发送者：",
+      "recipient": "接收方：",
       "time": "时间："
     },
     "fileNameInput": {

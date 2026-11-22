@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
+import 'package:localsend_app/model/persistence/transfer_history_entry.dart';
 import 'package:localsend_app/model/state/server/receive_session_state.dart';
 import 'package:localsend_app/model/state/server/receiving_file.dart';
 import 'package:localsend_app/pages/home_page.dart';
@@ -18,11 +19,11 @@ import 'package:localsend_app/provider/logging/discovery_logs_provider.dart';
 import 'package:localsend_app/provider/network/send_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/network/server/server_utils.dart';
-import 'package:localsend_app/provider/receive_history_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/provider/selection/selected_receiving_files_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/provider/transfer_history_provider.dart';
 import 'package:localsend_app/util/native/directories.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
@@ -193,18 +194,21 @@ class ReceiveController {
     if (message != null) {
       // Message already received
       await server.ref
-          .redux(receiveHistoryProvider)
+          .redux(transferHistoryProvider)
           .dispatchAsync(
-            AddHistoryEntryAction(
-              entryId: const Uuid().v4(),
-              fileName: message,
-              fileType: FileType.text,
-              path: null,
-              savedToGallery: false,
-              isMessage: true,
-              fileSize: utf8.encode(message).length,
-              senderAlias: server.getState().session!.senderAlias,
-              timestamp: DateTime.now().toUtc(),
+            RecordHistoryEntryAction(
+              TransferHistoryEntry(
+                id: const Uuid().v4(),
+                fileName: message,
+                fileType: FileType.text,
+                path: null,
+                savedToGallery: false,
+                isMessage: true,
+                fileSize: utf8.encode(message).length,
+                senderAlias: server.getState().session!.senderAlias,
+                timestamp: DateTime.now().toUtc(),
+                direction: TransferDirection.receive,
+              ),
             ),
           );
     }
@@ -388,18 +392,21 @@ class ReceiveController {
 
       // Track it in history
       await server.ref
-          .redux(receiveHistoryProvider)
+          .redux(transferHistoryProvider)
           .dispatchAsync(
-            AddHistoryEntryAction(
-              entryId: fileId,
-              fileName: receivingFile.desiredName!,
-              fileType: fileType,
-              path: filePath,
-              savedToGallery: event.savedToGallery,
-              isMessage: false,
-              fileSize: receivingFile.file.size,
-              senderAlias: receiveState.senderAlias,
-              timestamp: DateTime.now().toUtc(),
+            RecordHistoryEntryAction(
+              TransferHistoryEntry(
+                id: fileId,
+                fileName: receivingFile.desiredName!,
+                fileType: fileType,
+                path: filePath,
+                savedToGallery: event.savedToGallery,
+                isMessage: false,
+                fileSize: receivingFile.file.size,
+                senderAlias: receiveState.senderAlias,
+                timestamp: DateTime.now().toUtc(),
+                direction: TransferDirection.receive,
+              ),
             ),
           );
     } else {

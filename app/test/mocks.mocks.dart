@@ -7,20 +7,21 @@
 import 'dart:async' as _i5;
 import 'dart:ui' as _i3;
 
-import 'package:flutter/material.dart' as _i9;
-import 'package:localsend_app/gen/strings.g.dart' as _i11;
-import 'package:localsend_app/model/persistence/color_mode.dart' as _i10;
-import 'package:localsend_app/model/persistence/favorite_device.dart' as _i7;
-import 'package:localsend_app/model/persistence/quick_save_mode.dart' as _i12;
-import 'package:localsend_app/model/persistence/receive_history_entry.dart'
-    as _i6;
-import 'package:localsend_app/model/send_mode.dart' as _i13;
+import 'package:flutter/material.dart' as _i11;
+import 'package:localsend_app/gen/strings.g.dart' as _i13;
+import 'package:localsend_app/model/persistence/color_mode.dart' as _i12;
+import 'package:localsend_app/model/persistence/favorite_device.dart' as _i9;
+import 'package:localsend_app/model/persistence/history_direction_filter.dart' as _i7;
+import 'package:localsend_app/model/persistence/history_layer.dart' as _i8;
+import 'package:localsend_app/model/persistence/quick_save_mode.dart' as _i14;
+import 'package:localsend_app/model/persistence/transfer_history_entry.dart' as _i6;
+import 'package:localsend_app/model/send_mode.dart' as _i15;
 import 'package:localsend_app/provider/persistence_provider.dart' as _i4;
-import 'package:localsend_isolates/model/device.dart' as _i14;
+import 'package:localsend_isolates/model/device.dart' as _i16;
 import 'package:localsend_isolates/model/stored_security_context.dart' as _i2;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i8;
-import 'package:shared_preferences/shared_preferences.dart' as _i15;
+import 'package:mockito/src/dummies.dart' as _i10;
+import 'package:shared_preferences/shared_preferences.dart' as _i17;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -37,22 +38,18 @@ import 'package:shared_preferences/shared_preferences.dart' as _i15;
 // ignore_for_file: subtype_of_sealed_class
 // ignore_for_file: invalid_use_of_internal_member
 
-class _FakeStoredSecurityContext_0 extends _i1.SmartFake
-    implements _i2.StoredSecurityContext {
-  _FakeStoredSecurityContext_0(Object parent, Invocation parentInvocation)
-    : super(parent, parentInvocation);
+class _FakeStoredSecurityContext_0 extends _i1.SmartFake implements _i2.StoredSecurityContext {
+  _FakeStoredSecurityContext_0(Object parent, Invocation parentInvocation) : super(parent, parentInvocation);
 }
 
 class _FakeColor_1 extends _i1.SmartFake implements _i3.Color {
-  _FakeColor_1(Object parent, Invocation parentInvocation)
-    : super(parent, parentInvocation);
+  _FakeColor_1(Object parent, Invocation parentInvocation) : super(parent, parentInvocation);
 }
 
 /// A class which mocks [PersistenceService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockPersistenceService extends _i1.Mock
-    implements _i4.PersistenceService {
+class MockPersistenceService extends _i1.Mock implements _i4.PersistenceService {
   @override
   bool get isFirstAppStart =>
       (super.noSuchMethod(
@@ -114,34 +111,92 @@ class MockPersistenceService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
-  List<_i6.ReceiveHistoryEntry> getReceiveHistory() =>
+  List<_i6.TransferHistoryEntry> getTransferHistory() =>
       (super.noSuchMethod(
-            Invocation.method(#getReceiveHistory, []),
-            returnValue: <_i6.ReceiveHistoryEntry>[],
-            returnValueForMissingStub: <_i6.ReceiveHistoryEntry>[],
+            Invocation.method(#getTransferHistory, []),
+            returnValue: <_i6.TransferHistoryEntry>[],
+            returnValueForMissingStub: <_i6.TransferHistoryEntry>[],
           )
-          as List<_i6.ReceiveHistoryEntry>);
+          as List<_i6.TransferHistoryEntry>);
 
   @override
-  _i5.Future<void> setReceiveHistory(List<_i6.ReceiveHistoryEntry>? entries) =>
+  _i5.Future<void> setTransferHistory(
+    List<_i6.TransferHistoryEntry>? entries,
+  ) =>
       (super.noSuchMethod(
-            Invocation.method(#setReceiveHistory, [entries]),
+            Invocation.method(#setTransferHistory, [entries]),
             returnValue: _i5.Future<void>.value(),
             returnValueForMissingStub: _i5.Future<void>.value(),
           )
           as _i5.Future<void>);
 
   @override
-  List<_i7.FavoriteDevice> getFavorites() =>
+  int getHistoryLimit() =>
       (super.noSuchMethod(
-            Invocation.method(#getFavorites, []),
-            returnValue: <_i7.FavoriteDevice>[],
-            returnValueForMissingStub: <_i7.FavoriteDevice>[],
+            Invocation.method(#getHistoryLimit, []),
+            returnValue: 0,
+            returnValueForMissingStub: 0,
           )
-          as List<_i7.FavoriteDevice>);
+          as int);
 
   @override
-  _i5.Future<void> setFavorites(List<_i7.FavoriteDevice>? entries) =>
+  _i5.Future<void> setHistoryLimit(int? limit) =>
+      (super.noSuchMethod(
+            Invocation.method(#setHistoryLimit, [limit]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i7.HistoryDirectionFilter getHistoryDefaultFilter() =>
+      (super.noSuchMethod(
+            Invocation.method(#getHistoryDefaultFilter, []),
+            returnValue: _i7.HistoryDirectionFilter.all,
+            returnValueForMissingStub: _i7.HistoryDirectionFilter.all,
+          )
+          as _i7.HistoryDirectionFilter);
+
+  @override
+  _i5.Future<void> setHistoryDefaultFilter(
+    _i7.HistoryDirectionFilter? filter,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#setHistoryDefaultFilter, [filter]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  _i8.HistoryLayer getHistoryDefaultLayer() =>
+      (super.noSuchMethod(
+            Invocation.method(#getHistoryDefaultLayer, []),
+            returnValue: _i8.HistoryLayer.runtime,
+            returnValueForMissingStub: _i8.HistoryLayer.runtime,
+          )
+          as _i8.HistoryLayer);
+
+  @override
+  _i5.Future<void> setHistoryDefaultLayer(_i8.HistoryLayer? layer) =>
+      (super.noSuchMethod(
+            Invocation.method(#setHistoryDefaultLayer, [layer]),
+            returnValue: _i5.Future<void>.value(),
+            returnValueForMissingStub: _i5.Future<void>.value(),
+          )
+          as _i5.Future<void>);
+
+  @override
+  List<_i9.FavoriteDevice> getFavorites() =>
+      (super.noSuchMethod(
+            Invocation.method(#getFavorites, []),
+            returnValue: <_i9.FavoriteDevice>[],
+            returnValueForMissingStub: <_i9.FavoriteDevice>[],
+          )
+          as List<_i9.FavoriteDevice>);
+
+  @override
+  _i5.Future<void> setFavorites(List<_i9.FavoriteDevice>? entries) =>
       (super.noSuchMethod(
             Invocation.method(#setFavorites, [entries]),
             returnValue: _i5.Future<void>.value(),
@@ -153,11 +208,11 @@ class MockPersistenceService extends _i1.Mock
   String getShowToken() =>
       (super.noSuchMethod(
             Invocation.method(#getShowToken, []),
-            returnValue: _i8.dummyValue<String>(
+            returnValue: _i10.dummyValue<String>(
               this,
               Invocation.method(#getShowToken, []),
             ),
-            returnValueForMissingStub: _i8.dummyValue<String>(
+            returnValueForMissingStub: _i10.dummyValue<String>(
               this,
               Invocation.method(#getShowToken, []),
             ),
@@ -168,11 +223,11 @@ class MockPersistenceService extends _i1.Mock
   String getAlias() =>
       (super.noSuchMethod(
             Invocation.method(#getAlias, []),
-            returnValue: _i8.dummyValue<String>(
+            returnValue: _i10.dummyValue<String>(
               this,
               Invocation.method(#getAlias, []),
             ),
-            returnValueForMissingStub: _i8.dummyValue<String>(
+            returnValueForMissingStub: _i10.dummyValue<String>(
               this,
               Invocation.method(#getAlias, []),
             ),
@@ -189,16 +244,16 @@ class MockPersistenceService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
-  _i9.ThemeMode getTheme() =>
+  _i11.ThemeMode getTheme() =>
       (super.noSuchMethod(
             Invocation.method(#getTheme, []),
-            returnValue: _i9.ThemeMode.system,
-            returnValueForMissingStub: _i9.ThemeMode.system,
+            returnValue: _i11.ThemeMode.system,
+            returnValueForMissingStub: _i11.ThemeMode.system,
           )
-          as _i9.ThemeMode);
+          as _i11.ThemeMode);
 
   @override
-  _i5.Future<void> setTheme(_i9.ThemeMode? theme) =>
+  _i5.Future<void> setTheme(_i11.ThemeMode? theme) =>
       (super.noSuchMethod(
             Invocation.method(#setTheme, [theme]),
             returnValue: _i5.Future<void>.value(),
@@ -207,16 +262,16 @@ class MockPersistenceService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
-  _i10.ColorMode getColorMode() =>
+  _i12.ColorMode getColorMode() =>
       (super.noSuchMethod(
             Invocation.method(#getColorMode, []),
-            returnValue: _i10.ColorMode.system,
-            returnValueForMissingStub: _i10.ColorMode.system,
+            returnValue: _i12.ColorMode.system,
+            returnValueForMissingStub: _i12.ColorMode.system,
           )
-          as _i10.ColorMode);
+          as _i12.ColorMode);
 
   @override
-  _i5.Future<void> setColorMode(_i10.ColorMode? color) =>
+  _i5.Future<void> setColorMode(_i12.ColorMode? color) =>
       (super.noSuchMethod(
             Invocation.method(#setColorMode, [color]),
             returnValue: _i5.Future<void>.value(),
@@ -249,7 +304,7 @@ class MockPersistenceService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
-  _i5.Future<void> setLocale(_i11.AppLocale? locale) =>
+  _i5.Future<void> setLocale(_i13.AppLocale? locale) =>
       (super.noSuchMethod(
             Invocation.method(#setLocale, [locale]),
             returnValue: _i5.Future<void>.value(),
@@ -393,11 +448,11 @@ class MockPersistenceService extends _i1.Mock
   String getMulticastGroup() =>
       (super.noSuchMethod(
             Invocation.method(#getMulticastGroup, []),
-            returnValue: _i8.dummyValue<String>(
+            returnValue: _i10.dummyValue<String>(
               this,
               Invocation.method(#getMulticastGroup, []),
             ),
-            returnValueForMissingStub: _i8.dummyValue<String>(
+            returnValueForMissingStub: _i10.dummyValue<String>(
               this,
               Invocation.method(#getMulticastGroup, []),
             ),
@@ -477,16 +532,16 @@ class MockPersistenceService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
-  _i12.QuickSaveMode getQuickSave() =>
+  _i14.QuickSaveMode getQuickSave() =>
       (super.noSuchMethod(
             Invocation.method(#getQuickSave, []),
-            returnValue: _i12.QuickSaveMode.off,
-            returnValueForMissingStub: _i12.QuickSaveMode.off,
+            returnValue: _i14.QuickSaveMode.off,
+            returnValueForMissingStub: _i14.QuickSaveMode.off,
           )
-          as _i12.QuickSaveMode);
+          as _i14.QuickSaveMode);
 
   @override
-  _i5.Future<void> setQuickSave(_i12.QuickSaveMode? mode) =>
+  _i5.Future<void> setQuickSave(_i14.QuickSaveMode? mode) =>
       (super.noSuchMethod(
             Invocation.method(#setQuickSave, [mode]),
             returnValue: _i5.Future<void>.value(),
@@ -576,16 +631,16 @@ class MockPersistenceService extends _i1.Mock
           as _i5.Future<void>);
 
   @override
-  _i13.SendMode getSendMode() =>
+  _i15.SendMode getSendMode() =>
       (super.noSuchMethod(
             Invocation.method(#getSendMode, []),
-            returnValue: _i13.SendMode.single,
-            returnValueForMissingStub: _i13.SendMode.single,
+            returnValue: _i15.SendMode.single,
+            returnValueForMissingStub: _i15.SendMode.single,
           )
-          as _i13.SendMode);
+          as _i15.SendMode);
 
   @override
-  _i5.Future<void> setSendMode(_i13.SendMode? mode) =>
+  _i5.Future<void> setSendMode(_i15.SendMode? mode) =>
       (super.noSuchMethod(
             Invocation.method(#setSendMode, [mode]),
             returnValue: _i5.Future<void>.value(),
@@ -738,7 +793,7 @@ class MockPersistenceService extends _i1.Mock
           as bool);
 
   @override
-  _i5.Future<void> setDeviceType(_i14.DeviceType? deviceType) =>
+  _i5.Future<void> setDeviceType(_i16.DeviceType? deviceType) =>
       (super.noSuchMethod(
             Invocation.method(#setDeviceType, [deviceType]),
             returnValue: _i5.Future<void>.value(),
@@ -777,7 +832,7 @@ class MockPersistenceService extends _i1.Mock
 /// A class which mocks [SharedPreferences].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockSharedPreferences extends _i1.Mock implements _i15.SharedPreferences {
+class MockSharedPreferences extends _i1.Mock implements _i17.SharedPreferences {
   @override
   Set<String> getKeys() =>
       (super.noSuchMethod(

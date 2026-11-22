@@ -132,6 +132,11 @@
       "downloads": "(Downloads)",
       "saveToGallery": "Save media to gallery",
       "saveToHistory": "Save to history",
+      "historyLimit": "History entries",
+      "historyLimitUnlimited": "Unlimited",
+      "historyLimitCount": "{n}",
+      "historyDefaultFilter": "Default history filter",
+      "historyDefaultLayer": "Default history view",
       "verifyChecksums": "Verify file integrity after receiving"
     },
     "send": {
@@ -200,6 +205,18 @@
     "openFolder": "Open folder",
     "deleteHistory": "Delete history",
     "empty": "The history is empty.",
+    "clearRuntime": "Clear this session",
+    "sentTo": "To {alias}",
+    "receivedFrom": "From {alias}",
+    "segments": {
+      "runtime": "This session",
+      "persistent": "All time"
+    },
+    "filters": {
+      "all": "All",
+      "receive": "Received",
+      "send": "Sent"
+    },
     "entryActions": {
       "open": "Open file",
       "showInFolder": "Show in folder",
@@ -473,6 +490,7 @@
       "path": "Path:",
       "size": "Size:",
       "sender": "Sender:",
+      "recipient": "Recipient:",
       "time": "Time:"
     },
     "fileNameInput": {

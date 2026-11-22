@@ -2,6 +2,8 @@ import 'package:dart_mappable/dart_mappable.dart';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/color_mode.dart';
+import 'package:localsend_app/model/persistence/history_direction_filter.dart';
+import 'package:localsend_app/model/persistence/history_layer.dart';
 import 'package:localsend_app/model/send_mode.dart';
 import 'package:localsend_isolates/model/device.dart';
 
@@ -22,6 +24,9 @@ class SettingsState with SettingsStateMappable {
   final String? destination; // null = default
   final bool saveToGallery; // only Android, iOS
   final bool saveToHistory;
+  final int historyLimit; // number of entries kept in the persistent history, 0 = unlimited
+  final HistoryDirectionFilter historyDefaultFilter;
+  final HistoryLayer historyDefaultLayer;
   final bool quickSave; // automatically accept file requests
   final bool quickSaveFromFavorites; // automatically accept file requests from favorites
   final String? receivePin; // null = disabled
@@ -59,6 +64,9 @@ class SettingsState with SettingsStateMappable {
     required this.destination,
     required this.saveToGallery,
     required this.saveToHistory,
+    required this.historyLimit,
+    required this.historyDefaultFilter,
+    required this.historyDefaultLayer,
     required this.quickSave,
     required this.quickSaveFromFavorites,
     required this.receivePin,

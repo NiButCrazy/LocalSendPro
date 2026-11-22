@@ -315,6 +315,16 @@ class Translations$receiveHistoryPage$zh_CN extends Translations$receiveHistoryP
   @override
   String get empty => '无历史记录。';
   @override
+  String get clearRuntime => '清空本次运行';
+  @override
+  String sentTo({required Object alias}) => '发送到 ${alias}';
+  @override
+  String receivedFrom({required Object alias}) => '来自 ${alias}';
+  @override
+  late final Translations$receiveHistoryPage$segments$zh_CN segments = Translations$receiveHistoryPage$segments$zh_CN.internal(_root);
+  @override
+  late final Translations$receiveHistoryPage$filters$zh_CN filters = Translations$receiveHistoryPage$filters$zh_CN.internal(_root);
+  @override
   late final Translations$receiveHistoryPage$entryActions$zh_CN entryActions = Translations$receiveHistoryPage$entryActions$zh_CN.internal(_root);
 }
 
@@ -1015,6 +1025,16 @@ class Translations$settingsTab$receive$zh_CN extends Translations$settingsTab$re
   @override
   String get saveToHistory => '保存到历史记录';
   @override
+  String get historyLimit => '历史记录条数';
+  @override
+  String get historyLimitUnlimited => '不限';
+  @override
+  String historyLimitCount({required Object n}) => '${n} 条';
+  @override
+  String get historyDefaultFilter => '默认历史过滤';
+  @override
+  String get historyDefaultLayer => '默认历史范围';
+  @override
   String get verifyChecksums => '接收后校验文件完整性';
 }
 
@@ -1134,6 +1154,34 @@ class Translations$troubleshootPage$noConnection$zh_CN extends Translations$trou
   String get symptom => '双方设备均无法发现对方或者分享文件。';
   @override
   String get solution => '当问题发生在双方设备上时，请先确认双方设备处于同一个 Wi‑Fi 网络上，且共享相同的网络配置（端口、多播地址、加密选项）。若因 Wi‑Fi 不允许参与者间通信，那么请在路由器中关闭“接入点(AP)隔离”选项。';
+}
+
+// Path: receiveHistoryPage.segments
+class Translations$receiveHistoryPage$segments$zh_CN extends Translations$receiveHistoryPage$segments$en {
+  Translations$receiveHistoryPage$segments$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get runtime => '本次运行';
+  @override
+  String get persistent => '全部时间';
+}
+
+// Path: receiveHistoryPage.filters
+class Translations$receiveHistoryPage$filters$zh_CN extends Translations$receiveHistoryPage$filters$en {
+  Translations$receiveHistoryPage$filters$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get all => '全部';
+  @override
+  String get receive => '接收';
+  @override
+  String get send => '发送';
 }
 
 // Path: receiveHistoryPage.entryActions
@@ -1400,6 +1448,8 @@ class Translations$dialogs$fileInfo$zh_CN extends Translations$dialogs$fileInfo$
   String get size => '大小：';
   @override
   String get sender => '发送者：';
+  @override
+  String get recipient => '接收方：';
   @override
   String get time => '时间：';
 }

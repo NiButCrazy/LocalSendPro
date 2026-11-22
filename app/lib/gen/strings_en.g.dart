@@ -351,6 +351,17 @@ class Translations$receiveHistoryPage$en {
   /// en: 'The history is empty.'
   String get empty => 'The history is empty.';
 
+  /// en: 'Clear this session'
+  String get clearRuntime => 'Clear this session';
+
+  /// en: 'To {alias}'
+  String sentTo({required Object alias}) => 'To ${alias}';
+
+  /// en: 'From {alias}'
+  String receivedFrom({required Object alias}) => 'From ${alias}';
+
+  late final Translations$receiveHistoryPage$segments$en segments = Translations$receiveHistoryPage$segments$en.internal(_root);
+  late final Translations$receiveHistoryPage$filters$en filters = Translations$receiveHistoryPage$filters$en.internal(_root);
   late final Translations$receiveHistoryPage$entryActions$en entryActions = Translations$receiveHistoryPage$entryActions$en.internal(_root);
 }
 
@@ -1177,6 +1188,21 @@ class Translations$settingsTab$receive$en {
   /// en: 'Save to history'
   String get saveToHistory => 'Save to history';
 
+  /// en: 'History entries'
+  String get historyLimit => 'History entries';
+
+  /// en: 'Unlimited'
+  String get historyLimitUnlimited => 'Unlimited';
+
+  /// en: '{n}'
+  String historyLimitCount({required Object n}) => '${n}';
+
+  /// en: 'Default history filter'
+  String get historyDefaultFilter => 'Default history filter';
+
+  /// en: 'Default history view'
+  String get historyDefaultLayer => 'Default history view';
+
   /// en: 'Verify file integrity after receiving'
   String get verifyChecksums => 'Verify file integrity after receiving';
 }
@@ -1330,6 +1356,39 @@ class Translations$troubleshootPage$noConnection$en {
   /// en: 'Does the problem exist on both sides? If so, you need to make sure that both devices are on the same Wi-Fi network and share the same configuration (port, multicast address, encryption). The Wi-Fi network may not allow communication between participants due to Access Point (AP) Isolation. In this case, this option must be disabled on the router.'
   String get solution =>
       'Does the problem exist on both sides? If so, you need to make sure that both devices are on the same Wi-Fi network and share the same configuration (port, multicast address, encryption). The Wi-Fi network may not allow communication between participants due to Access Point (AP) Isolation. In this case, this option must be disabled on the router.';
+}
+
+// Path: receiveHistoryPage.segments
+class Translations$receiveHistoryPage$segments$en {
+  Translations$receiveHistoryPage$segments$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'This session'
+  String get runtime => 'This session';
+
+  /// en: 'All time'
+  String get persistent => 'All time';
+}
+
+// Path: receiveHistoryPage.filters
+class Translations$receiveHistoryPage$filters$en {
+  Translations$receiveHistoryPage$filters$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'All'
+  String get all => 'All';
+
+  /// en: 'Received'
+  String get receive => 'Received';
+
+  /// en: 'Sent'
+  String get send => 'Sent';
 }
 
 // Path: receiveHistoryPage.entryActions
@@ -1645,6 +1704,9 @@ class Translations$dialogs$fileInfo$en {
 
   /// en: 'Sender:'
   String get sender => 'Sender:';
+
+  /// en: 'Recipient:'
+  String get recipient => 'Recipient:';
 
   /// en: 'Time:'
   String get time => 'Time:';
