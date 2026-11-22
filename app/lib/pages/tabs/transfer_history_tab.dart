@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -44,6 +45,8 @@ enum _EntryOption {
 const _optionsAll = _EntryOption.values;
 final _optionsWithoutOpen = [_EntryOption.info, _EntryOption.delete];
 
+enum _DeleteMissingChoice { thisOnly, allMissing }
+
 extension on HistoryDirectionFilter {
   String get label {
     return switch (this) {
@@ -65,6 +68,10 @@ class _TransferHistoryTabState extends State<TransferHistoryTab> {
   HistoryLayer _layer = HistoryLayer.runtime;
   late HistoryDirectionFilter _directionFilter;
   bool _filterInitialized = false;
+
+  /// Whether the file behind an entry still exists, checked lazily per entry.
+  final Map<String, bool> _fileExists = {};
+  final Set<String> _checkingFiles = {};
 
   @override
   void didChangeDependencies() {
@@ -93,6 +100,47 @@ class _TransferHistoryTabState extends State<TransferHistoryTab> {
 
   void _toggleLayer() {
     setState(() => _layer = _layer == HistoryLayer.runtime ? HistoryLayer.persistent : HistoryLayer.runtime);
+  }
+
+  /// Checks the file once, the first time the entry is built.
+  void _ensureFileExists(TransferHistoryEntry entry) {
+    final path = entry.path;
+    if (path == null || path.startsWith('content://') || _fileExists.containsKey(entry.id) || !_checkingFiles.add(entry.id)) {
+      return;
+    }
+
+    unawaited(
+      File(path).exists().then(
+        (exists) {
+          if (!mounted) {
+            return;
+          }
+          setState(() => _fileExists[entry.id] = exists);
+        },
+        onError: (_) {
+          if (!mounted) {
+            return;
+          }
+          setState(() => _fileExists[entry.id] = false);
+        },
+      ),
+    );
+  }
+
+  /// Collects the entries of [entries] whose file no longer exists.
+  Future<Set<String>> _collectMissingFileIds(List<TransferHistoryEntry> entries) async {
+    final missing = <String>{};
+    for (final entry in entries) {
+      final path = entry.path;
+      if (path == null || path.startsWith('content://')) {
+        continue;
+      }
+      final exists = _fileExists[entry.id] ?? await File(path).exists().catchError((_) => false);
+      if (!exists) {
+        missing.add(entry.id);
+      }
+    }
+    return missing;
   }
 
   Future<void> _clear() async {
@@ -260,6 +308,8 @@ class _TransferHistoryTabState extends State<TransferHistoryTab> {
         else
           Column(
             children: entries.map((entry) {
+              _ensureFileExists(entry);
+              final fileMissing = _fileExists[entry.id] == false;
               final peer = entry.direction == TransferDirection.send
                   ? t.receiveHistoryPage.sentTo(alias: entry.senderAlias)
                   : t.receiveHistoryPage.receivedFrom(alias: entry.senderAlias);
@@ -274,7 +324,7 @@ class _TransferHistoryTabState extends State<TransferHistoryTab> {
                     highlightColor: Colors.transparent,
                     hoverColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
                     borderRadius: const BorderRadius.all(Radius.circular(8)),
-                    onTap: entry.path != null || entry.isMessage
+                    onTap: !fileMissing && (entry.path != null || entry.isMessage)
                         ? () async {
                             if (entry.isMessage) {
                               final vm = ViewProvider((ref) {
@@ -313,9 +363,46 @@ class _TransferHistoryTabState extends State<TransferHistoryTab> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        FilePathThumbnail(
-                          path: entry.path,
-                          fileType: entry.fileType,
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            FilePathThumbnail(
+                              path: entry.path,
+                              fileType: entry.fileType,
+                            ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: IgnorePointer(
+                                ignoring: !fileMissing,
+                                child: AnimatedScale(
+                                  scale: fileMissing ? 1 : 0,
+                                  alignment: Alignment.topRight,
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutBack,
+                                  child: AnimatedOpacity(
+                                    opacity: fileMissing ? 1 : 0,
+                                    duration: const Duration(milliseconds: 180),
+                                    child: Tooltip(
+                                      message: t.receiveHistoryPage.fileMissing,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.error,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.priority_high,
+                                          size: 10,
+                                          color: Theme.of(context).colorScheme.onError,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -323,12 +410,18 @@ class _TransferHistoryTabState extends State<TransferHistoryTab> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 3),
-                              Text(
-                                entry.fileName,
-                                style: const TextStyle(fontSize: 16),
-                                maxLines: 1,
-                                overflow: TextOverflow.fade,
-                                softWrap: false,
+                              AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 180),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: fileMissing ? 0.5 : 1),
+                                ),
+                                child: Text(
+                                  entry.fileName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.fade,
+                                  softWrap: false,
+                                ),
                               ),
                               Text(
                                 '${entry.timestampString(context)} - ${entry.fileSize.asReadableFileSize} - $peer',
@@ -363,13 +456,63 @@ class _TransferHistoryTabState extends State<TransferHistoryTab> {
                                 );
                                 break;
                               case _EntryOption.delete:
+                                if (!fileMissing) {
+                                  // ignore: use_build_context_synchronously
+                                  await context.redux(transferHistoryProvider).dispatchAsync(RemoveHistoryEntryAction(_layer, entry.id));
+                                  break;
+                                }
+
+                                // Offer to clean up every entry whose file is gone as well.
+                                final missingFileIds = await _collectMissingFileIds(layerEntries);
+                                missingFileIds.add(entry.id);
+                                if (!mounted) {
+                                  return;
+                                }
+                                if (missingFileIds.length <= 1) {
+                                  // ignore: use_build_context_synchronously
+                                  await context.redux(transferHistoryProvider).dispatchAsync(RemoveHistoryEntryAction(_layer, entry.id));
+                                  break;
+                                }
                                 // ignore: use_build_context_synchronously
-                                await context.redux(transferHistoryProvider).dispatchAsync(RemoveHistoryEntryAction(_layer, entry.id));
+                                final choice = await showDialog<_DeleteMissingChoice>(
+                                  // ignore: use_build_context_synchronously
+                                  context: context,
+                                  builder: (context) {
+                                    return AlertDialog(
+                                      title: Text(t.receiveHistoryPage.entryActions.deleteFromHistory),
+                                      content: Text(t.receiveHistoryPage.deleteMissingPrompt(n: missingFileIds.length)),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => context.pop(),
+                                          child: Text(t.general.cancel),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => context.pop(_DeleteMissingChoice.thisOnly),
+                                          child: Text(t.receiveHistoryPage.deleteThisOnly),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () => context.pop(_DeleteMissingChoice.allMissing),
+                                          child: Text(t.receiveHistoryPage.deleteAllMissing),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (!mounted || choice == null) {
+                                  return;
+                                }
+                                // ignore: use_build_context_synchronously
+                                final dispatcher = context.redux(transferHistoryProvider);
+                                if (choice == _DeleteMissingChoice.allMissing) {
+                                  await dispatcher.dispatchAsync(RemoveHistoryEntriesAction(_layer, missingFileIds));
+                                } else {
+                                  await dispatcher.dispatchAsync(RemoveHistoryEntryAction(_layer, entry.id));
+                                }
                                 break;
                             }
                           },
                           itemBuilder: (BuildContext context) {
-                            return (entry.path != null ? _optionsAll : _optionsWithoutOpen).map((e) {
+                            return (entry.path != null && !fileMissing ? _optionsAll : _optionsWithoutOpen).map((e) {
                               return PopupMenuItem<_EntryOption>(
                                 value: e,
                                 child: Text(e.label),

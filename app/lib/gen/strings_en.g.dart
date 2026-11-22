@@ -366,6 +366,18 @@ class Translations$receiveHistoryPage$en {
   /// en: 'From {alias}'
   String receivedFrom({required Object alias}) => 'From ${alias}';
 
+  /// en: 'File no longer exists'
+  String get fileMissing => 'File no longer exists';
+
+  /// en: '{n} entries point to files that no longer exist. Delete all of them?'
+  String deleteMissingPrompt({required Object n}) => '${n} entries point to files that no longer exist. Delete all of them?';
+
+  /// en: 'Only this entry'
+  String get deleteThisOnly => 'Only this entry';
+
+  /// en: 'Delete all missing'
+  String get deleteAllMissing => 'Delete all missing';
+
   late final Translations$receiveHistoryPage$segments$en segments = Translations$receiveHistoryPage$segments$en.internal(_root);
   late final Translations$receiveHistoryPage$filters$en filters = Translations$receiveHistoryPage$filters$en.internal(_root);
   late final Translations$receiveHistoryPage$entryActions$en entryActions = Translations$receiveHistoryPage$entryActions$en.internal(_root);

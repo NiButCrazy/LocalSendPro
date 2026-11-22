@@ -210,6 +210,10 @@
     "clearRuntime": "Clear this session",
     "sentTo": "To {alias}",
     "receivedFrom": "From {alias}",
+    "fileMissing": "File no longer exists",
+    "deleteMissingPrompt": "{n} entries point to files that no longer exist. Delete all of them?",
+    "deleteThisOnly": "Only this entry",
+    "deleteAllMissing": "Delete all missing",
     "segments": {
       "runtime": "This session",
       "persistent": "All time"

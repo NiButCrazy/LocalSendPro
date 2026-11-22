@@ -325,6 +325,14 @@ class Translations$receiveHistoryPage$zh_CN extends Translations$receiveHistoryP
   @override
   String receivedFrom({required Object alias}) => '来自 ${alias}';
   @override
+  String get fileMissing => '文件已不存在';
+  @override
+  String deleteMissingPrompt({required Object n}) => '共有 ${n} 项记录指向的文件已不存在。是否全部删除？';
+  @override
+  String get deleteThisOnly => '仅删除此项';
+  @override
+  String get deleteAllMissing => '删除全部不存在项';
+  @override
   late final Translations$receiveHistoryPage$segments$zh_CN segments = Translations$receiveHistoryPage$segments$zh_CN.internal(_root);
   @override
   late final Translations$receiveHistoryPage$filters$zh_CN filters = Translations$receiveHistoryPage$filters$zh_CN.internal(_root);

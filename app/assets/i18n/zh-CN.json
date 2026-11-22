@@ -210,6 +210,10 @@
     "clearRuntime": "清空本次运行",
     "sentTo": "发送到 {alias}",
     "receivedFrom": "来自 {alias}",
+    "fileMissing": "文件已不存在",
+    "deleteMissingPrompt": "共有 {n} 项记录指向的文件已不存在。是否全部删除？",
+    "deleteThisOnly": "仅删除此项",
+    "deleteAllMissing": "删除全部不存在项",
     "segments": {
       "runtime": "本次运行",
       "persistent": "全部时间"

@@ -82,6 +82,32 @@ class RemoveHistoryEntryAction extends AsyncReduxAction<TransferHistoryService, 
   }
 }
 
+/// Removes several entries from the given layer.
+class RemoveHistoryEntriesAction extends AsyncReduxAction<TransferHistoryService, TransferHistoryState> {
+  final HistoryLayer layer;
+  final Set<String> entryIds;
+
+  RemoveHistoryEntriesAction(this.layer, this.entryIds);
+
+  @override
+  Future<TransferHistoryState> reduce() async {
+    if (entryIds.isEmpty) {
+      return state;
+    }
+    final entries = layer == HistoryLayer.runtime ? state.runtime : state.persistent;
+    final updated = entries.where((e) => !entryIds.contains(e.id)).toList();
+    if (updated.length == entries.length) {
+      return state;
+    }
+
+    if (layer == HistoryLayer.runtime) {
+      return TransferHistoryState(runtime: updated, persistent: state.persistent);
+    }
+    await notifier._persistence.setTransferHistory(updated);
+    return TransferHistoryState(runtime: state.runtime, persistent: updated);
+  }
+}
+
 /// Removes all entries of the given layer.
 class ClearHistoryAction extends AsyncReduxAction<TransferHistoryService, TransferHistoryState> {
   final HistoryLayer layer;
