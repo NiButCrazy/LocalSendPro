@@ -22,10 +22,12 @@ constexpr int kAnimationDurationMs = 180;
 constexpr int kAnimationSlide = 10;  // logical pixels
 constexpr BYTE kWindowAlpha = 255;   // fully opaque
 
-// Smooths the progress bar between the throttled updates from the Dart side.
+// Smooths the progress bar between updates from the Dart side (every ~100 ms).
+// The factor is deliberately small so the bar keeps moving continuously instead
+// of catching up in a burst and then standing still until the next update.
 constexpr UINT_PTR kProgressTimerId = 2;
 constexpr int kProgressIntervalMs = 16;
-constexpr double kProgressEase = 0.25;
+constexpr double kProgressEase = 0.12;
 
 double EaseOutCubic(double t) {
   const double remaining = 1.0 - t;

@@ -33,6 +33,46 @@ class TransferNotification {
   static Duration _completionDisplayDuration = const Duration(seconds: 3);
   static Timer? _completionTimer;
 
+  /// Whether the main app window is visible and not minimized.
+  ///
+  /// The native Windows progress window only appears while the main window is hidden or
+  /// minimized; while it is visible the in-app progress page covers the same information.
+  static bool _mainWindowActive = true;
+
+  /// Updates whether the main window is visible and not minimized.
+  ///
+  /// The window manager listener calls this on show/hide/minimize/restore. Showing the main
+  /// window hides the native progress window; hiding or minimizing it shows the current state.
+  static void setMainWindowActive(bool active) {
+    if (_mainWindowActive == active) {
+      return;
+    }
+    _mainWindowActive = active;
+
+    if (_mainWindowActive) {
+      TransferProgressWindow.hide();
+    } else {
+      _showProgressWindow();
+    }
+  }
+
+  /// Shows the current aggregate state in the native window, unless the main window is visible.
+  static void _showProgressWindow() {
+    if (_mainWindowActive || _transfers.isEmpty) {
+      return;
+    }
+    final snapshot = _snapshot();
+    TransferProgressWindow.show(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
+  }
+
+  /// Forwards progress to the native window, unless the main window is visible.
+  static void _updateProgressWindow(({String title, String windowTitle, String text, String windowText, int percentage}) snapshot) {
+    if (_mainWindowActive) {
+      return;
+    }
+    TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
+  }
+
   /// Injects the translated strings. Must be called before the first transfer starts.
   /// The locale is pinned on app start, so one call is enough.
   static void init(
@@ -51,6 +91,7 @@ class TransferNotification {
   /// Only for tests: forgets every registered transfer.
   static void resetForTest() {
     _transfers.clear();
+    _mainWindowActive = true;
     _cancelCompletionTimer();
   }
 
@@ -83,7 +124,7 @@ class TransferNotification {
         text: snapshot.text,
         progress: snapshot.percentage,
       );
-      TransferProgressWindow.show(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
+      _showProgressWindow();
     }
   }
 
@@ -111,7 +152,7 @@ class TransferNotification {
 
     final snapshot = _snapshot();
     ForegroundService.updateNotification(title: snapshot.title, text: snapshot.text, progress: snapshot.percentage);
-    TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
+    _updateProgressWindow(snapshot);
   }
 
   /// Unregisters a transfer, stopping the service once the last one is gone.
@@ -136,12 +177,18 @@ class TransferNotification {
     } else {
       final snapshot = _snapshot();
       ForegroundService.updateNotification(title: snapshot.title, text: snapshot.text, progress: snapshot.percentage);
-      TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
+      _updateProgressWindow(snapshot);
     }
   }
 
   static void _showOutcome(_Transfer transfer, TransferOutcome outcome) {
     _cancelCompletionTimer();
+
+    // Keep the native window out of the way while the user can see the app itself.
+    if (_mainWindowActive) {
+      TransferProgressWindow.hide();
+      return;
+    }
 
     var remainingSeconds = _completionDisplayDuration.inSeconds;
     if (remainingSeconds <= 0) {
@@ -163,6 +210,9 @@ class TransferNotification {
         timer.cancel();
         _completionTimer = null;
         TransferProgressWindow.hide();
+        return;
+      }
+      if (_mainWindowActive) {
         return;
       }
       TransferProgressWindow.update(
@@ -206,12 +256,8 @@ class TransferNotification {
     final text = StringBuffer('$percentage%\t$readableCurrent / $readableTotal');
 
     final countdown = strings.completionCountdown(seconds: remainingSeconds);
-    final speed = transfer.speedInBytes;
-    if (speed != null) {
-      text.write('\n$countdown\t${speed.asReadableFileSize}/s');
-    } else {
-      text.write('\n$countdown');
-    }
+    // The transfer is over: the average speed of the attempt is not useful here.
+    text.write('\n$countdown');
 
     return text.toString();
   }

@@ -31,6 +31,8 @@ void main() {
       ),
       completionDisplayDuration: Duration.zero,
     );
+    // Most tests exercise the native window, which only appears while the app window is hidden.
+    TransferNotification.setMainWindowActive(false);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       return null;
@@ -55,6 +57,30 @@ void main() {
     final arguments = calls.single.arguments as Map<Object?, Object?>;
     expect(arguments['title'], 'Sending files');
     expect(arguments['progress'], 0.0);
+  });
+
+  test('does not show the window while the app window is visible', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.setMainWindowActive(true);
+
+    TransferNotification.start(sessionId: 'a', receiving: false);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(calls, isEmpty);
+  });
+
+  test('shows the running transfer once the app window is hidden', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.setMainWindowActive(true);
+    TransferNotification.start(sessionId: 'a', receiving: false);
+
+    TransferNotification.setMainWindowActive(false);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(calls, hasLength(1));
+    expect(calls.single.method, 'showProgress');
+    final arguments = calls.single.arguments as Map<Object?, Object?>;
+    expect(arguments['title'], 'Sending files');
   });
 
   test('updates the window with aggregated progress', () async {

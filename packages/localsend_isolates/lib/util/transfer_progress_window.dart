@@ -15,8 +15,9 @@ class TransferProgressWindow {
 
   static const _channel = MethodChannel('org.localsend.localsend_app/transfer_progress');
 
-  /// Same interval as [ForegroundService]: the native window does not need more repaints.
-  static const _updateInterval = Duration(milliseconds: 500);
+  /// The native window interpolates between updates, so it can follow the transfer much more
+  /// closely than the Android notification, which stays throttled by [ForegroundService].
+  static const _updateInterval = Duration(milliseconds: 100);
 
   static bool _visible = false;
   static DateTime? _lastUpdate;

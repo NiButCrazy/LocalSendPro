@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -13,8 +14,11 @@ import 'package:localsend_app/pages/tabs/transfer_history_tab.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/native/cross_file_converters.dart';
+import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/widget/responsive_builder.dart';
+import 'package:localsend_isolates/util/transfer_notification.dart';
 import 'package:refena_flutter/refena_flutter.dart';
+import 'package:window_manager/window_manager.dart';
 
 enum HomeTab {
   receive(Icons.wifi),
@@ -57,18 +61,51 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with Refena {
+class _HomePageState extends State<HomePage> with Refena, WindowListener {
   bool _dragAndDropIndicator = false;
 
   @override
   void initState() {
     super.initState();
 
+    if (checkPlatform([TargetPlatform.windows])) {
+      windowManager.addListener(this);
+      unawaited(_syncMainWindowActive());
+    }
+
     ensureRef((ref) async {
       ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(widget.initialTab));
       await postInit(context, ref, widget.appStart);
     });
   }
+
+  @override
+  void dispose() {
+    if (checkPlatform([TargetPlatform.windows])) {
+      windowManager.removeListener(this);
+    }
+    super.dispose();
+  }
+
+  /// Keeps the native transfer window hidden while the app window is usable.
+  Future<void> _syncMainWindowActive() async {
+    final visible = await windowManager.isVisible();
+    final minimized = await windowManager.isMinimized();
+    TransferNotification.setMainWindowActive(visible && !minimized);
+  }
+
+  @override
+  void onWindowEvent(String eventName) {
+    if (eventName == 'show' || eventName == 'hide') {
+      unawaited(_syncMainWindowActive());
+    }
+  }
+
+  @override
+  void onWindowMinimize() => unawaited(_syncMainWindowActive());
+
+  @override
+  void onWindowRestore() => unawaited(_syncMainWindowActive());
 
   @override
   Widget build(BuildContext context) {
