@@ -128,11 +128,10 @@ class QuickSendCoordinator {
       return;
     }
 
-    TransferNotification.stop(sessionId);
-
     // 主窗口可见时按普通发送打开页面；隐藏时保持后台，只通过通知和设备列表徽标反映状态。
     final foreground = await _isMainWindowActive();
     if (foreground) {
+      TransferNotification.stop(sessionId);
       _ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
     }
     await _ref
@@ -142,6 +141,9 @@ class QuickSendCoordinator {
           files: files,
           background: !foreground,
           notifyWhileWaiting: !foreground,
+          // 隐藏时沿用“查找设备”的会话 id：startPending 会在原位把文字改成“等待响应”，
+          // 避免先 hide 再 show，触发原生窗口尚未结束的隐藏动画而瞬间消失。
+          sessionIdOverride: foreground ? null : sessionId,
         );
   }
 
