@@ -98,6 +98,13 @@ class SettingsTab extends StatelessWidget {
                   buttonLabel: vm.settings.locale?.getLocaleName() ?? t.settingsTab.general.languageOptions.system,
                   onTap: () => vm.onTapLanguage(context),
                 ),
+                _BooleanEntry(
+                  label: t.settingsTab.general.animations,
+                  value: vm.settings.enableAnimations,
+                  onChanged: (b) async {
+                    await ref.notifier(settingsProvider).setEnableAnimations(b);
+                  },
+                ),
                 if (checkPlatformIsDesktop()) ...[
                   _BooleanEntry(
                     label: t.settingsTab.general.alwaysOnTop,
@@ -202,73 +209,11 @@ class SettingsTab extends StatelessWidget {
                       onChanged: (_) => vm.onToggleShowInContextMenu(context),
                     ),
                 ],
-                _BooleanEntry(
-                  label: t.settingsTab.general.animations,
-                  value: vm.settings.enableAnimations,
-                  onChanged: (b) async {
-                    await ref.notifier(settingsProvider).setEnableAnimations(b);
-                  },
-                ),
               ],
             ),
             _SettingsSection(
               title: t.settingsTab.receive.title,
               children: [
-                _BooleanEntry(
-                  label: t.settingsTab.receive.quickSave,
-                  value: vm.settings.quickSave,
-                  onChanged: (b) async {
-                    final old = vm.settings.quickSave;
-                    await ref.notifier(settingsProvider).setQuickSave(b);
-                    if (b) {
-                      await ref.notifier(settingsProvider).setQuickSaveFromFavorites(false);
-                    }
-                    if (!old && b && context.mounted) {
-                      await QuickSaveNotice.open(context);
-                    }
-                  },
-                ),
-                _BooleanEntry(
-                  label: t.settingsTab.receive.quickSaveFromFavorites,
-                  value: vm.settings.quickSaveFromFavorites,
-                  onChanged: (b) async {
-                    final old = vm.settings.quickSaveFromFavorites;
-                    await ref.notifier(settingsProvider).setQuickSaveFromFavorites(b);
-                    if (b) {
-                      await ref.notifier(settingsProvider).setQuickSave(false);
-                    }
-                    if (!old && b && context.mounted) {
-                      await QuickSaveFromFavoritesNotice.open(context);
-                    }
-                  },
-                ),
-                _BooleanEntry(
-                  label: t.settingsTab.receive.requirePin,
-                  value: vm.settings.receivePin != null,
-                  onChanged: (b) async {
-                    final currentPIN = vm.settings.receivePin;
-                    if (currentPIN != null) {
-                      await ref.notifier(settingsProvider).setReceivePin(null);
-                    } else {
-                      final String? newPin = await showDialog<String>(
-                        context: context,
-                        builder: (_) => const PinDialog(
-                          obscureText: false,
-                          generateRandom: false,
-                        ),
-                      );
-
-                      if (newPin != null && newPin.isNotEmpty) {
-                        await ref.notifier(settingsProvider).setReceivePin(newPin);
-                      }
-                    }
-
-                    // The pin is enforced by the Rust server, so it needs a restart.
-                    if (ref.read(serverProvider) != null) {
-                      await ref.notifier(serverProvider).restartServerFromSettings();
-                    }
-                  },
-                ),
                 if (checkPlatformWithFileSystem())
                   _SettingsEntry(
                     label: t.settingsTab.receive.destination,
@@ -301,6 +246,34 @@ class SettingsTab extends StatelessWidget {
                       ),
                     ),
                   ),
+                _BooleanEntry(
+                  label: t.settingsTab.receive.quickSave,
+                  value: vm.settings.quickSave,
+                  onChanged: (b) async {
+                    final old = vm.settings.quickSave;
+                    await ref.notifier(settingsProvider).setQuickSave(b);
+                    if (b) {
+                      await ref.notifier(settingsProvider).setQuickSaveFromFavorites(false);
+                    }
+                    if (!old && b && context.mounted) {
+                      await QuickSaveNotice.open(context);
+                    }
+                  },
+                ),
+                _BooleanEntry(
+                  label: t.settingsTab.receive.quickSaveFromFavorites,
+                  value: vm.settings.quickSaveFromFavorites,
+                  onChanged: (b) async {
+                    final old = vm.settings.quickSaveFromFavorites;
+                    await ref.notifier(settingsProvider).setQuickSaveFromFavorites(b);
+                    if (b) {
+                      await ref.notifier(settingsProvider).setQuickSave(false);
+                    }
+                    if (!old && b && context.mounted) {
+                      await QuickSaveFromFavoritesNotice.open(context);
+                    }
+                  },
+                ),
                 if (checkPlatformWithGallery())
                   _BooleanEntry(
                     label: t.settingsTab.receive.saveToGallery,
@@ -314,6 +287,33 @@ class SettingsTab extends StatelessWidget {
                   value: vm.settings.autoFinish,
                   onChanged: (b) async {
                     await ref.notifier(settingsProvider).setAutoFinish(b);
+                  },
+                ),
+                _BooleanEntry(
+                  label: t.settingsTab.receive.requirePin,
+                  value: vm.settings.receivePin != null,
+                  onChanged: (b) async {
+                    final currentPIN = vm.settings.receivePin;
+                    if (currentPIN != null) {
+                      await ref.notifier(settingsProvider).setReceivePin(null);
+                    } else {
+                      final String? newPin = await showDialog<String>(
+                        context: context,
+                        builder: (_) => const PinDialog(
+                          obscureText: false,
+                          generateRandom: false,
+                        ),
+                      );
+
+                      if (newPin != null && newPin.isNotEmpty) {
+                        await ref.notifier(settingsProvider).setReceivePin(newPin);
+                      }
+                    }
+
+                    // The pin is enforced by the Rust server, so it needs a restart.
+                    if (ref.read(serverProvider) != null) {
+                      await ref.notifier(serverProvider).restartServerFromSettings();
+                    }
                   },
                 ),
                 _BooleanEntry(
@@ -563,31 +563,6 @@ class SettingsTab extends StatelessWidget {
                     ),
                   ),
                 if (vm.advanced)
-                  _ButtonEntry(
-                    label: t.settingsTab.network.network,
-                    buttonLabel: switch (vm.settings.networkWhitelist != null || vm.settings.networkBlacklist != null) {
-                      true => t.settingsTab.network.networkOptions.filtered,
-                      false => t.settingsTab.network.networkOptions.all,
-                    },
-                    onTap: () async {
-                      await context.push(() => const NetworkInterfacesPage());
-                    },
-                  ),
-                if (vm.advanced)
-                  _SettingsEntry(
-                    label: t.settingsTab.network.discoveryTimeout,
-                    child: TextFieldTv(
-                      name: t.settingsTab.network.discoveryTimeout,
-                      controller: vm.timeoutController,
-                      onChanged: (s) async {
-                        final timeout = int.tryParse(s);
-                        if (timeout != null) {
-                          await ref.notifier(settingsProvider).setDiscoveryTimeout(timeout);
-                        }
-                      },
-                    ),
-                  ),
-                if (vm.advanced)
                   _BooleanEntry(
                     label: t.settingsTab.network.encryption,
                     value: vm.settings.https,
@@ -600,6 +575,17 @@ class SettingsTab extends StatelessWidget {
                     },
                   ),
                 if (vm.advanced)
+                  _ButtonEntry(
+                    label: t.settingsTab.network.network,
+                    buttonLabel: switch (vm.settings.networkWhitelist != null || vm.settings.networkBlacklist != null) {
+                      true => t.settingsTab.network.networkOptions.filtered,
+                      false => t.settingsTab.network.networkOptions.all,
+                    },
+                    onTap: () async {
+                      await context.push(() => const NetworkInterfacesPage());
+                    },
+                  ),
+                if (vm.advanced)
                   _SettingsEntry(
                     label: t.settingsTab.network.multicastGroup,
                     child: TextFieldTv(
@@ -607,6 +593,20 @@ class SettingsTab extends StatelessWidget {
                       controller: vm.multicastController,
                       onChanged: (s) async {
                         await ref.notifier(settingsProvider).setMulticastGroup(s);
+                      },
+                    ),
+                  ),
+                if (vm.advanced)
+                  _SettingsEntry(
+                    label: t.settingsTab.network.discoveryTimeout,
+                    child: TextFieldTv(
+                      name: t.settingsTab.network.discoveryTimeout,
+                      controller: vm.timeoutController,
+                      onChanged: (s) async {
+                        final timeout = int.tryParse(s);
+                        if (timeout != null) {
+                          await ref.notifier(settingsProvider).setDiscoveryTimeout(timeout);
+                        }
                       },
                     ),
                   ),
