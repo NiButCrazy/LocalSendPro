@@ -140,6 +140,10 @@ Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\Directory\Backg
 [UninstallDelete]
 Type: files; Name: "{userappdata}\Microsoft\Windows\SendTo\LocalSend.lnk"
 
+[CustomMessages]
+DeleteUserDataPrompt=Do you also want to delete your LocalSend settings and transfer history? Choose No to keep them.
+chinesesimplified.DeleteUserDataPrompt=是否同时删除 LocalSend 的设置和传输历史？选择“否”将保留这些数据。
+
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
@@ -155,6 +159,7 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ResultCode: Integer;
+  UserDataPath: String;
 begin
   if CurUninstallStep = usUninstall then
   begin
@@ -165,6 +170,15 @@ begin
   begin
     // Add-AppxPackage -Register creates this empty folder in the package root.
     DelTree(ExpandConstant('{app}\microsoft.system.package.metadata'), True, True, True);
+
+    // Keep user data by default. Silent uninstalls never delete it.
+    UserDataPath := ExpandConstant('{userappdata}\LocalSend');
+    if (not UninstallSilent) and DirExists(UserDataPath) then
+    begin
+      if MsgBox(CustomMessage('DeleteUserDataPrompt') + #13#10#13#10 + UserDataPath,
+                mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+        DelTree(UserDataPath, True, True, True);
+    end;
   end;
 end;
 
