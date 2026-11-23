@@ -139,7 +139,7 @@ class SettingsTab extends StatelessWidget {
                     ),
                     _BooleanEntry(
                       label: t.settingsTab.general.backgroundMode,
-                      description: t.settingsTab.general.backgroundModeDescription,
+                      description: vm.advanced ? t.settingsTab.general.backgroundModeDescription : null,
                       value: vm.settings.backgroundMode,
                       onChanged: (b) async {
                         await ref.notifier(settingsProvider).setBackgroundMode(b);
@@ -148,7 +148,7 @@ class SettingsTab extends StatelessWidget {
                     if (checkPlatform([TargetPlatform.windows]))
                       _BooleanEntry(
                         label: t.settingsTab.general.showTrayIcon,
-                        description: t.settingsTab.general.showTrayIconDescription,
+                        description: vm.advanced ? t.settingsTab.general.showTrayIconDescription : null,
                         value: vm.settings.showTrayIcon,
                         onChanged: (b) async {
                           await ref.notifier(settingsProvider).setShowTrayIcon(b);
