@@ -293,7 +293,8 @@
     "quickSendDescription": "List nearby devices in the submenu. Clicking a device sends immediately.",
     "searching": "Looking for device…",
     "deviceUnavailable": "Device not found. Select a device manually.",
-    "noDevices": "No devices available"
+    "noDevices": "No devices available",
+    "requestPending": "A file request is already waiting for the recipient. Handle it on the phone first."
   },
   "progressPage": {
     "titleSending": "Sending files",

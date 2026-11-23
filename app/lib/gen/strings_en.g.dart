@@ -563,6 +563,9 @@ class Translations$contextMenuPage$en {
 
   /// en: 'No devices available'
   String get noDevices => 'No devices available';
+
+  /// en: 'A file request is already waiting for the recipient. Handle it on the phone first.'
+  String get requestPending => 'A file request is already waiting for the recipient. Handle it on the phone first.';
 }
 
 // Path: progressPage

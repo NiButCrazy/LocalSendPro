@@ -488,6 +488,8 @@ class Translations$contextMenuPage$zh_CN extends Translations$contextMenuPage$en
   String get deviceUnavailable => '未找到设备，请手动选择设备发送。';
   @override
   String get noDevices => '没有可发送的设备';
+  @override
+  String get requestPending => '已有一个文件请求正在等待对方确认，请先在手机上处理后再发送。';
 }
 
 // Path: progressPage

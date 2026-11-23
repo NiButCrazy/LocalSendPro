@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/cross_file.dart';
+import 'package:localsend_app/model/state/send/send_session_state.dart';
 import 'package:localsend_app/pages/home_page.dart';
 import 'package:localsend_app/pages/home_page_controller.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
@@ -11,6 +12,7 @@ import 'package:localsend_app/provider/selection/selected_sending_files_provider
 import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/util/ui/snackbar.dart';
 import 'package:localsend_isolates/model/device.dart';
+import 'package:localsend_isolates/model/session_status.dart';
 import 'package:localsend_isolates/util/transfer_notification.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -59,6 +61,13 @@ class QuickSendCoordinator {
       if (filesAdded) {
         _ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
       }
+      return;
+    }
+
+    // 手机端同一时间只处理一个会话：已有请求在等待确认时，新的快速发送会被 409 拒绝，
+    // 而第二次请求还会让手机上的旧请求显得像被取消。这里直接拦截并提示。
+    if (hasPendingRequest(_ref.read(sendProvider).values, fingerprint)) {
+      _showPendingRequestNotice();
       return;
     }
 
@@ -142,7 +151,22 @@ class QuickSendCoordinator {
     Routerino.context.showSnackBar(t.contextMenuPage.deviceUnavailable);
   }
 
+  void _showPendingRequestNotice() {
+    unawaited(showFromTray());
+    Routerino.context.showSnackBar(t.contextMenuPage.requestPending);
+  }
+
   static String _searchSessionId(String fingerprint) => 'search:$fingerprint';
+}
+
+/// 该设备是否已有请求正在等待对方确认。
+///
+/// 手机端同一时间只允许一个会话；等待确认阶段（尚无 `remoteSessionId`）也占用这个位置。
+@visibleForTesting
+bool hasPendingRequest(Iterable<SendSessionState> sessions, String fingerprint) {
+  return sessions.any(
+    (session) => session.target.fingerprint == fingerprint && session.status == SessionStatus.waiting && session.remoteSessionId == null,
+  );
 }
 
 /// 应用启动参数入口：普通启动与右键菜单快速发送共用。

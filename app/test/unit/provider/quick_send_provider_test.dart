@@ -1,7 +1,10 @@
 import 'dart:io';
 
+import 'package:localsend_app/model/state/send/send_session_state.dart';
 import 'package:localsend_app/provider/quick_send_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_isolates/model/device.dart';
+import 'package:localsend_isolates/model/session_status.dart';
 import 'package:path/path.dart' as p;
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:test/test.dart';
@@ -16,6 +19,24 @@ void main() {
       expect(sendToFingerprint(['--hidden']), isNull);
       expect(sendToFingerprint(['--send-to']), isNull);
       expect(sendToFingerprint(['--send-to', '   ']), isNull);
+    });
+  });
+
+  group('hasPendingRequest', () {
+    test('等待确认且尚无远端会话时阻止同一设备', () {
+      final sessions = [_session(fingerprint: 'fp', status: SessionStatus.waiting)];
+
+      expect(hasPendingRequest(sessions, 'fp'), isTrue);
+      expect(hasPendingRequest(sessions, 'other'), isFalse);
+    });
+
+    test('已接受或已结束的会话不阻止', () {
+      expect(
+        hasPendingRequest([_session(fingerprint: 'fp', status: SessionStatus.waiting, remoteSessionId: 'remote')], 'fp'),
+        isFalse,
+      );
+      expect(hasPendingRequest([_session(fingerprint: 'fp', status: SessionStatus.sending, remoteSessionId: 'remote')], 'fp'), isFalse);
+      expect(hasPendingRequest([_session(fingerprint: 'fp', status: SessionStatus.finished)], 'fp'), isFalse);
     });
   });
 
@@ -45,4 +66,40 @@ void main() {
       expect(added, isTrue);
     });
   });
+}
+
+Device _device({required String fingerprint, required String alias}) {
+  return Device(
+    signalingId: null,
+    ip: '192.168.1.10',
+    version: '2.2',
+    port: 53317,
+    https: true,
+    fingerprint: fingerprint,
+    alias: alias,
+    deviceModel: null,
+    deviceType: DeviceType.desktop,
+    download: false,
+    channels: const [HttpChannel(host: '192.168.1.10', port: 53317, https: true)],
+  );
+}
+
+SendSessionState _session({
+  required String fingerprint,
+  required SessionStatus status,
+  String? remoteSessionId,
+}) {
+  return SendSessionState(
+    sessionId: 'session-$fingerprint',
+    remoteSessionId: remoteSessionId,
+    background: true,
+    status: status,
+    target: _device(fingerprint: fingerprint, alias: fingerprint),
+    files: const {},
+    hashedFileCount: 1,
+    startTime: null,
+    endTime: null,
+    sendingTasks: null,
+    errorMessage: null,
+  );
 }
