@@ -70,6 +70,8 @@ class TranslationsZhCn extends Translations with BaseTranslations<AppLocale, Tra
   @override
   late final Translations$sendPage$zh_CN sendPage = Translations$sendPage$zh_CN.internal(_root);
   @override
+  late final Translations$contextMenuPage$zh_CN contextMenuPage = Translations$contextMenuPage$zh_CN.internal(_root);
+  @override
   late final Translations$progressPage$zh_CN progressPage = Translations$progressPage$zh_CN.internal(_root);
   @override
   late final Translations$webSharePage$zh_CN webSharePage = Translations$webSharePage$zh_CN.internal(_root);
@@ -461,6 +463,31 @@ class Translations$sendPage$zh_CN extends Translations$sendPage$en {
   String get tooManyAttempts => _root.web.tooManyAttempts;
   @override
   String get busy => '对方正在处理另一个请求。';
+  @override
+  String get pinRequired => '接收方启用了 PIN。';
+}
+
+// Path: contextMenuPage
+class Translations$contextMenuPage$zh_CN extends Translations$contextMenuPage$en {
+  Translations$contextMenuPage$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '右键菜单';
+  @override
+  String get enableDescription => '在文件、文件夹和文件夹空白处的右键菜单中显示 LocalSend。';
+  @override
+  String get quickSend => '右键菜单快速发送';
+  @override
+  String get quickSendDescription => '在二级菜单中列出附近设备，点击设备后直接发送。';
+  @override
+  String get searching => '正在查找设备…';
+  @override
+  String get deviceUnavailable => '未找到设备，请手动选择设备发送。';
+  @override
+  String get noDevices => '没有可发送的设备';
 }
 
 // Path: progressPage

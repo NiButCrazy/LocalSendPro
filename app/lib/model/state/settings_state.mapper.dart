@@ -211,6 +211,11 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     'advancedSettings',
     _$advancedSettings,
   );
+  static bool _$contextMenuQuickSend(SettingsState v) => v.contextMenuQuickSend;
+  static const Field<SettingsState, bool> _f$contextMenuQuickSend = Field(
+    'contextMenuQuickSend',
+    _$contextMenuQuickSend,
+  );
 
   @override
   final MappableFields<SettingsState> fields = const {
@@ -252,6 +257,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     #verifyChecksums: _f$verifyChecksums,
     #discoveryTimeout: _f$discoveryTimeout,
     #advancedSettings: _f$advancedSettings,
+    #contextMenuQuickSend: _f$contextMenuQuickSend,
   };
 
   static SettingsState _instantiate(DecodingData data) {
@@ -294,6 +300,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
       verifyChecksums: data.dec(_f$verifyChecksums),
       discoveryTimeout: data.dec(_f$discoveryTimeout),
       advancedSettings: data.dec(_f$advancedSettings),
+      contextMenuQuickSend: data.dec(_f$contextMenuQuickSend),
     );
   }
 
@@ -402,6 +409,7 @@ abstract class SettingsStateCopyWith<$R, $In extends SettingsState, $Out>
     bool? verifyChecksums,
     int? discoveryTimeout,
     bool? advancedSettings,
+    bool? contextMenuQuickSend,
   });
   SettingsStateCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -472,6 +480,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
     bool? verifyChecksums,
     int? discoveryTimeout,
     bool? advancedSettings,
+    bool? contextMenuQuickSend,
   }) => $apply(
     FieldCopyWithData({
       if (showToken != null) #showToken: showToken,
@@ -519,6 +528,8 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       if (verifyChecksums != null) #verifyChecksums: verifyChecksums,
       if (discoveryTimeout != null) #discoveryTimeout: discoveryTimeout,
       if (advancedSettings != null) #advancedSettings: advancedSettings,
+      if (contextMenuQuickSend != null)
+        #contextMenuQuickSend: contextMenuQuickSend,
     }),
   );
   @override
@@ -582,6 +593,10 @@ class _SettingsStateCopyWithImpl<$R, $Out>
     verifyChecksums: data.get(#verifyChecksums, or: $value.verifyChecksums),
     discoveryTimeout: data.get(#discoveryTimeout, or: $value.discoveryTimeout),
     advancedSettings: data.get(#advancedSettings, or: $value.advancedSettings),
+    contextMenuQuickSend: data.get(
+      #contextMenuQuickSend,
+      or: $value.contextMenuQuickSend,
+    ),
   );
 
   @override

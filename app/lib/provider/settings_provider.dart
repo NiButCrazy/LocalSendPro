@@ -93,6 +93,7 @@ class SettingsService extends PureNotifier<SettingsState> {
     verifyChecksums: _persistence.getVerifyChecksums(),
     discoveryTimeout: _persistence.getDiscoveryTimeout(),
     advancedSettings: _persistence.getAdvancedSettingsEnabled(),
+    contextMenuQuickSend: _persistence.isContextMenuQuickSend(),
   );
 
   Future<void> setAlias(String alias) async {
@@ -127,6 +128,13 @@ class SettingsService extends PureNotifier<SettingsState> {
     await _persistence.setAdvancedSettingsEnabled(isEnabled);
     state = state.copyWith(
       advancedSettings: isEnabled,
+    );
+  }
+
+  Future<void> setContextMenuQuickSend(bool value) async {
+    await _persistence.setContextMenuQuickSend(value);
+    state = state.copyWith(
+      contextMenuQuickSend: value,
     );
   }
 

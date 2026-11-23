@@ -283,7 +283,17 @@
     "waiting": "Waiting for response…",
     "rejected": "The recipient has rejected the request.",
     "tooManyAttempts": "@:web.tooManyAttempts",
-    "busy": "The recipient is busy with another request."
+    "busy": "The recipient is busy with another request.",
+    "pinRequired": "The recipient requires a PIN."
+  },
+  "contextMenuPage": {
+    "title": "Context menu",
+    "enableDescription": "Show LocalSend when right-clicking files, folders and folder backgrounds.",
+    "quickSend": "Quick send from the context menu",
+    "quickSendDescription": "List nearby devices in the submenu. Clicking a device sends immediately.",
+    "searching": "Looking for device…",
+    "deviceUnavailable": "Device not found. Select a device manually.",
+    "noDevices": "No devices available"
   },
   "progressPage": {
     "titleSending": "Sending files",

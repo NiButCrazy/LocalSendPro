@@ -83,11 +83,6 @@ class SettingsTabVmMapper extends ClassMapperBase<SettingsTabVm> {
     'autoStartLaunchHidden',
     _$autoStartLaunchHidden,
   );
-  static bool _$showInContextMenu(SettingsTabVm v) => v.showInContextMenu;
-  static const Field<SettingsTabVm, bool> _f$showInContextMenu = Field(
-    'showInContextMenu',
-    _$showInContextMenu,
-  );
   static Function _$onChangeTheme(SettingsTabVm v) =>
       (v as dynamic).onChangeTheme as Function;
   static dynamic _arg$onChangeTheme(f) =>
@@ -131,16 +126,6 @@ class SettingsTabVmMapper extends ClassMapperBase<SettingsTabVm> {
         'onToggleAutoStartLaunchHidden',
         _$onToggleAutoStartLaunchHidden,
         arg: _arg$onToggleAutoStartLaunchHidden,
-      );
-  static Function _$onToggleShowInContextMenu(SettingsTabVm v) =>
-      (v as dynamic).onToggleShowInContextMenu as Function;
-  static dynamic _arg$onToggleShowInContextMenu(f) =>
-      f<void Function(BuildContext)>();
-  static const Field<SettingsTabVm, Function> _f$onToggleShowInContextMenu =
-      Field(
-        'onToggleShowInContextMenu',
-        _$onToggleShowInContextMenu,
-        arg: _arg$onToggleShowInContextMenu,
       );
   static Function _$onTapRestartServer(SettingsTabVm v) =>
       (v as dynamic).onTapRestartServer as Function;
@@ -195,13 +180,11 @@ class SettingsTabVmMapper extends ClassMapperBase<SettingsTabVm> {
     #colorModes: _f$colorModes,
     #autoStart: _f$autoStart,
     #autoStartLaunchHidden: _f$autoStartLaunchHidden,
-    #showInContextMenu: _f$showInContextMenu,
     #onChangeTheme: _f$onChangeTheme,
     #onChangeColorMode: _f$onChangeColorMode,
     #onTapLanguage: _f$onTapLanguage,
     #onToggleAutoStart: _f$onToggleAutoStart,
     #onToggleAutoStartLaunchHidden: _f$onToggleAutoStartLaunchHidden,
-    #onToggleShowInContextMenu: _f$onToggleShowInContextMenu,
     #onTapRestartServer: _f$onTapRestartServer,
     #onTapStartServer: _f$onTapStartServer,
     #onTapStopServer: _f$onTapStopServer,
@@ -223,13 +206,11 @@ class SettingsTabVmMapper extends ClassMapperBase<SettingsTabVm> {
       colorModes: data.dec(_f$colorModes),
       autoStart: data.dec(_f$autoStart),
       autoStartLaunchHidden: data.dec(_f$autoStartLaunchHidden),
-      showInContextMenu: data.dec(_f$showInContextMenu),
       onChangeTheme: data.dec(_f$onChangeTheme),
       onChangeColorMode: data.dec(_f$onChangeColorMode),
       onTapLanguage: data.dec(_f$onTapLanguage),
       onToggleAutoStart: data.dec(_f$onToggleAutoStart),
       onToggleAutoStartLaunchHidden: data.dec(_f$onToggleAutoStartLaunchHidden),
-      onToggleShowInContextMenu: data.dec(_f$onToggleShowInContextMenu),
       onTapRestartServer: data.dec(_f$onTapRestartServer),
       onTapStartServer: data.dec(_f$onTapStartServer),
       onTapStopServer: data.dec(_f$onTapStopServer),
@@ -316,13 +297,11 @@ abstract class SettingsTabVmCopyWith<$R, $In extends SettingsTabVm, $Out>
     List<ColorMode>? colorModes,
     bool? autoStart,
     bool? autoStartLaunchHidden,
-    bool? showInContextMenu,
     void Function(BuildContext, ThemeMode)? onChangeTheme,
     void Function(BuildContext, ColorMode)? onChangeColorMode,
     void Function(BuildContext)? onTapLanguage,
     void Function(BuildContext)? onToggleAutoStart,
     void Function(BuildContext)? onToggleAutoStartLaunchHidden,
-    void Function(BuildContext)? onToggleShowInContextMenu,
     void Function(BuildContext)? onTapRestartServer,
     void Function(BuildContext)? onTapStartServer,
     void Function()? onTapStopServer,
@@ -366,13 +345,11 @@ class _SettingsTabVmCopyWithImpl<$R, $Out>
     List<ColorMode>? colorModes,
     bool? autoStart,
     bool? autoStartLaunchHidden,
-    bool? showInContextMenu,
     void Function(BuildContext, ThemeMode)? onChangeTheme,
     void Function(BuildContext, ColorMode)? onChangeColorMode,
     void Function(BuildContext)? onTapLanguage,
     void Function(BuildContext)? onToggleAutoStart,
     void Function(BuildContext)? onToggleAutoStartLaunchHidden,
-    void Function(BuildContext)? onToggleShowInContextMenu,
     void Function(BuildContext)? onTapRestartServer,
     void Function(BuildContext)? onTapStartServer,
     void Function()? onTapStopServer,
@@ -394,15 +371,12 @@ class _SettingsTabVmCopyWithImpl<$R, $Out>
       if (autoStart != null) #autoStart: autoStart,
       if (autoStartLaunchHidden != null)
         #autoStartLaunchHidden: autoStartLaunchHidden,
-      if (showInContextMenu != null) #showInContextMenu: showInContextMenu,
       if (onChangeTheme != null) #onChangeTheme: onChangeTheme,
       if (onChangeColorMode != null) #onChangeColorMode: onChangeColorMode,
       if (onTapLanguage != null) #onTapLanguage: onTapLanguage,
       if (onToggleAutoStart != null) #onToggleAutoStart: onToggleAutoStart,
       if (onToggleAutoStartLaunchHidden != null)
         #onToggleAutoStartLaunchHidden: onToggleAutoStartLaunchHidden,
-      if (onToggleShowInContextMenu != null)
-        #onToggleShowInContextMenu: onToggleShowInContextMenu,
       if (onTapRestartServer != null) #onTapRestartServer: onTapRestartServer,
       if (onTapStartServer != null) #onTapStartServer: onTapStartServer,
       if (onTapStopServer != null) #onTapStopServer: onTapStopServer,
@@ -435,10 +409,6 @@ class _SettingsTabVmCopyWithImpl<$R, $Out>
       #autoStartLaunchHidden,
       or: $value.autoStartLaunchHidden,
     ),
-    showInContextMenu: data.get(
-      #showInContextMenu,
-      or: $value.showInContextMenu,
-    ),
     onChangeTheme: data.get(#onChangeTheme, or: $value.onChangeTheme),
     onChangeColorMode: data.get(
       #onChangeColorMode,
@@ -452,10 +422,6 @@ class _SettingsTabVmCopyWithImpl<$R, $Out>
     onToggleAutoStartLaunchHidden: data.get(
       #onToggleAutoStartLaunchHidden,
       or: $value.onToggleAutoStartLaunchHidden,
-    ),
-    onToggleShowInContextMenu: data.get(
-      #onToggleShowInContextMenu,
-      or: $value.onToggleShowInContextMenu,
     ),
     onTapRestartServer: data.get(
       #onTapRestartServer,

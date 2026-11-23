@@ -109,6 +109,7 @@ const _createChecksums = 'ls_create_checksums';
 const _verifyChecksums = 'ls_verify_checksums';
 const _advancedSettingsKey = 'ls_advanced_settings';
 const _whatsNewKey = 'ls_whats_new';
+const _contextMenuQuickSend = 'ls_context_menu_quick_send';
 
 final persistenceProvider = Provider<PersistenceService>((ref) {
   throw Exception('persistenceProvider not initialized');
@@ -596,6 +597,14 @@ class PersistenceService {
 
   Future<void> setAdvancedSettingsEnabled(bool isEnabled) async {
     await _prefs.setBool(_advancedSettingsKey, isEnabled);
+  }
+
+  bool isContextMenuQuickSend() {
+    return _prefs.getBool(_contextMenuQuickSend) ?? false;
+  }
+
+  Future<void> setContextMenuQuickSend(bool value) async {
+    await _prefs.setBool(_contextMenuQuickSend, value);
   }
 
   QuickSaveMode getQuickSave() {

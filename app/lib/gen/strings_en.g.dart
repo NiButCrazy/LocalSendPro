@@ -60,6 +60,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
   late final Translations$receivePage$en receivePage = Translations$receivePage$en.internal(_root);
   late final Translations$receiveOptionsPage$en receiveOptionsPage = Translations$receiveOptionsPage$en.internal(_root);
   late final Translations$sendPage$en sendPage = Translations$sendPage$en.internal(_root);
+  late final Translations$contextMenuPage$en contextMenuPage = Translations$contextMenuPage$en.internal(_root);
   late final Translations$progressPage$en progressPage = Translations$progressPage$en.internal(_root);
   late final Translations$webSharePage$en webSharePage = Translations$webSharePage$en.internal(_root);
   late final Translations$webReceivePage$en webReceivePage = Translations$webReceivePage$en.internal(_root);
@@ -529,6 +530,39 @@ class Translations$sendPage$en {
 
   /// en: 'The recipient is busy with another request.'
   String get busy => 'The recipient is busy with another request.';
+
+  /// en: 'The recipient requires a PIN.'
+  String get pinRequired => 'The recipient requires a PIN.';
+}
+
+// Path: contextMenuPage
+class Translations$contextMenuPage$en {
+  Translations$contextMenuPage$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Context menu'
+  String get title => 'Context menu';
+
+  /// en: 'Show LocalSend when right-clicking files, folders and folder backgrounds.'
+  String get enableDescription => 'Show LocalSend when right-clicking files, folders and folder backgrounds.';
+
+  /// en: 'Quick send from the context menu'
+  String get quickSend => 'Quick send from the context menu';
+
+  /// en: 'List nearby devices in the submenu. Clicking a device sends immediately.'
+  String get quickSendDescription => 'List nearby devices in the submenu. Clicking a device sends immediately.';
+
+  /// en: 'Looking for device…'
+  String get searching => 'Looking for device…';
+
+  /// en: 'Device not found. Select a device manually.'
+  String get deviceUnavailable => 'Device not found. Select a device manually.';
+
+  /// en: 'No devices available'
+  String get noDevices => 'No devices available';
 }
 
 // Path: progressPage

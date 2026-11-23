@@ -9,6 +9,7 @@ import 'package:localsend_app/model/persistence/history_direction_filter.dart';
 import 'package:localsend_app/model/persistence/history_layer.dart';
 import 'package:localsend_app/pages/about/about_page.dart';
 import 'package:localsend_app/pages/changelog_page.dart';
+import 'package:localsend_app/pages/context_menu_page.dart';
 import 'package:localsend_app/pages/donation/donation_page.dart';
 import 'package:localsend_app/pages/settings/network_interfaces_page.dart';
 import 'package:localsend_app/pages/tabs/settings_tab_controller.dart';
@@ -203,10 +204,12 @@ class SettingsTab extends StatelessWidget {
                     ),
                   ],
                   if (checkPlatform([TargetPlatform.windows]))
-                    _BooleanEntry(
-                      label: t.settingsTab.general.showInContextMenu,
-                      value: vm.showInContextMenu,
-                      onChanged: (_) => vm.onToggleShowInContextMenu(context),
+                    _ButtonEntry(
+                      label: t.contextMenuPage.title,
+                      buttonLabel: t.general.open,
+                      onTap: () async {
+                        await context.push(() => const ContextMenuPage());
+                      },
                     ),
                 ],
               ],
