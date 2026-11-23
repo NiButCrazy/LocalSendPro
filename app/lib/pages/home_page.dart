@@ -67,10 +67,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with Refena, WindowListener {
   bool _dragAndDropIndicator = false;
 
-  /// 右键菜单设备子菜单的同步定时器（仅 Windows）。
-  Timer? _contextMenuTimer;
+  /// 右键菜单设备子菜单的防抖定时器（仅 Windows）。
+  Timer? _contextMenuDebounce;
 
-  /// 上一次写入子菜单时的内容签名，避免每 2 秒重写注册表。
+  /// 监听设置/设备/收藏变化的订阅。
+  final _contextMenuSubscriptions = <StreamSubscription<dynamic>>[];
+
+  /// 上一次写入子菜单时的内容签名，避免无变化时打开注册表。
   String? _contextMenuSignature;
 
   @override
@@ -89,7 +92,7 @@ class _HomePageState extends State<HomePage> with Refena, WindowListener {
         return;
       }
       if (checkPlatform([TargetPlatform.windows])) {
-        _contextMenuTimer = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_syncContextMenuDevices()));
+        _startContextMenuSync();
         await _syncContextMenuDevices();
       }
     });
@@ -97,11 +100,27 @@ class _HomePageState extends State<HomePage> with Refena, WindowListener {
 
   @override
   void dispose() {
-    _contextMenuTimer?.cancel();
+    _contextMenuDebounce?.cancel();
+    for (final subscription in _contextMenuSubscriptions) {
+      unawaited(subscription.cancel());
+    }
     if (checkPlatform([TargetPlatform.windows])) {
       windowManager.removeListener(this);
     }
     super.dispose();
+  }
+
+  /// 设备、收藏或开关变化后合并 500ms 内的多次事件，再写一次注册表。
+  void _startContextMenuSync() {
+    void onChange() {
+      _contextMenuDebounce?.cancel();
+      _contextMenuDebounce = Timer(const Duration(milliseconds: 500), () => unawaited(_syncContextMenuDevices()));
+    }
+
+    _contextMenuSubscriptions
+      ..add(ref.stream(settingsProvider).listen((_) => onChange()))
+      ..add(ref.stream(nearbyDevicesProvider).listen((_) => onChange()))
+      ..add(ref.stream(favoritesProvider).listen((_) => onChange()));
   }
 
   /// 把当前发现列表同步到右键菜单的设备子菜单。
