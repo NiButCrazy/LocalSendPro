@@ -36,6 +36,8 @@ DisableDirPage=no
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+CloseApplications=no
+RestartApplications=no
 #ifdef LooseRegister
 ; Loose registration must be performed for the installing user, so install per-user (no UAC).
 PrivilegesRequired=lowest
@@ -139,6 +141,28 @@ Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\Directory\Backg
 Type: files; Name: "{userappdata}\Microsoft\Windows\SendTo\LocalSend.lnk"
 
 [Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  // A hidden/tray instance keeps the exe and its DLLs open. Inno's Restart
+  // Manager cannot always close it, so terminate it before replacing files.
+  Exec('taskkill.exe', '/F /IM {#MyAppExeName} /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(500);
+  Result := '';
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    Exec('taskkill.exe', '/F /IM {#MyAppExeName} /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(500);
+  end;
+end;
+
 #ifdef LooseRegister
 function DeveloperModeEnabled(): Boolean;
 var

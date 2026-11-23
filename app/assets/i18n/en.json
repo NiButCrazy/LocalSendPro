@@ -121,7 +121,7 @@
       "transferCompletedDurationOff": "Not shown",
       "launchAtStartup": "Autostart after login",
       "launchMinimized": "Autostart: Start hidden",
-      "showInContextMenu": "Show LocalSend in the context menu",
+      "showInContextMenu": "Integrate with the context menu",
       "animations": "Animations"
     },
     "receive": {

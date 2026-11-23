@@ -1164,8 +1164,8 @@ class Translations$settingsTab$general$en {
   /// en: 'Autostart: Start hidden'
   String get launchMinimized => 'Autostart: Start hidden';
 
-  /// en: 'Show LocalSend in the context menu'
-  String get showInContextMenu => 'Show LocalSend in the context menu';
+  /// en: 'Integrate with the context menu'
+  String get showInContextMenu => 'Integrate with the context menu';
 
   /// en: 'Animations'
   String get animations => 'Animations';

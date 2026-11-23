@@ -121,7 +121,7 @@
       "transferCompletedDurationOff": "不显示",
       "launchAtStartup": "登录系统后自动启动程序",
       "launchMinimized": "自动启动时隐藏窗口",
-      "showInContextMenu": "在右键菜单中显示 LocalSend",
+      "showInContextMenu": "集成右键菜单",
       "animations": "动画效果"
     },
     "receive": {

@@ -1006,7 +1006,7 @@ class Translations$settingsTab$general$zh_CN extends Translations$settingsTab$ge
   @override
   String get launchMinimized => '自动启动时隐藏窗口';
   @override
-  String get showInContextMenu => '在右键菜单中显示 LocalSend';
+  String get showInContextMenu => '集成右键菜单';
   @override
   String get animations => '动画效果';
 }
