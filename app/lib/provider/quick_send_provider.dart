@@ -9,6 +9,7 @@ import 'package:localsend_app/pages/home_page_controller.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/network/send_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/util/ui/snackbar.dart';
 import 'package:localsend_isolates/model/device.dart';
@@ -17,6 +18,7 @@ import 'package:localsend_isolates/util/transfer_notification.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
+import 'package:window_manager/window_manager.dart';
 
 final _logger = Logger('QuickSend');
 
@@ -127,14 +129,35 @@ class QuickSendCoordinator {
     }
 
     TransferNotification.stop(sessionId);
+
+    // 主窗口可见时按普通发送打开页面；隐藏时保持后台，只通过通知和设备列表徽标反映状态。
+    final foreground = await _isMainWindowActive();
+    if (foreground) {
+      _ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+    }
     await _ref
         .notifier(sendProvider)
         .startSession(
           target: target,
           files: files,
-          background: true,
-          notifyWhileWaiting: true,
+          background: !foreground,
+          notifyWhileWaiting: !foreground,
         );
+  }
+
+  /// 主窗口是否可见且未最小化（只有 Windows 有原生通知窗口）。
+  Future<bool> _isMainWindowActive() async {
+    if (!checkPlatform([TargetPlatform.windows])) {
+      return true;
+    }
+    try {
+      final visible = await windowManager.isVisible();
+      final minimized = await windowManager.isMinimized();
+      return visible && !minimized;
+    } catch (e) {
+      _logger.warning('Could not read the main window state', e);
+      return TransferNotification.isMainWindowActive;
+    }
   }
 
   /// 只有当前可直连的设备才算找到：通过信令发现的设备没有 IP。
