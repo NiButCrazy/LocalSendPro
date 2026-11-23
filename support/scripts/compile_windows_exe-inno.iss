@@ -160,6 +160,11 @@ begin
   begin
     Exec('taskkill.exe', '/F /IM {#MyAppExeName} /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(500);
+  end
+  else if CurUninstallStep = usPostUninstall then
+  begin
+    // Add-AppxPackage -Register creates this empty folder in the package root.
+    DelTree(ExpandConstant('{app}\microsoft.system.package.metadata'), True, True, True);
   end;
 end;
 
