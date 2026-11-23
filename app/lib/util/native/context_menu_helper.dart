@@ -21,6 +21,16 @@ const _maxDeviceEntries = 20;
 /// `ECF_DISABLED`：让无设备时的占位项不可点击。
 const _ecfDisabled = 0x2;
 
+/// 三个父动词的位置：文件、文件夹、文件夹背景。
+const _verbPaths = <List<String>>[
+  ['*', 'shell', _verbKey],
+  ['Directory', 'shell', _verbKey],
+  ['Directory', 'Background', 'shell', _verbKey],
+];
+
+/// 上一次写入设备子项的内容签名，避免无变化的重复重写。
+String? _lastDeviceSignature;
+
 /// 右键菜单里的一个设备条目。
 @immutable
 class DeviceMenuEntry {
@@ -47,13 +57,18 @@ Future<bool> enableContextMenu({required bool quickSend}) async {
   }
 
   try {
+    // 只有父键在“普通动词”和“级联菜单”之间切换（或首次写入）时才需要通知外壳。
+    // 每次启动都刷新会让桌面图标/关联闪一下。
+    final structureChanged = !_menuStructureMatches(quickSend: quickSend);
     final menuWritten = _writeContextMenu(quickSend: quickSend);
     try {
       await _createSendToShortcut();
     } catch (e, stackTrace) {
       _logger.warning('Could not create the SendTo shortcut', e, stackTrace);
     }
-    notifyShellAssociationsChanged();
+    if (structureChanged) {
+      notifyShellAssociationsChanged();
+    }
     return menuWritten;
   } catch (e, stackTrace) {
     _logger.severe('Failed to enable context menu', e, stackTrace);
@@ -67,12 +82,15 @@ Future<bool> disableContextMenu() async {
   }
 
   try {
+    final wasEnabled = await isContextMenuEnabled();
     final shortcut = File(_getWindowsFilePath(_windowsFileName));
     if (await shortcut.exists()) {
       await shortcut.delete();
     }
     final deleted = _deleteContextMenu();
-    notifyShellAssociationsChanged();
+    if (wasEnabled) {
+      notifyShellAssociationsChanged();
+    }
     return deleted;
   } catch (e, stackTrace) {
     _logger.warning('Failed to disable context menu', e, stackTrace);
@@ -137,7 +155,7 @@ Future<void> updateContextMenuDevices({
     } finally {
       classes.close();
     }
-    notifyShellAssociationsChanged();
+    // 设备子项只在展开级联菜单时读取，不需要 SHChangeNotify：那会让桌面刷新。
   } catch (e, stackTrace) {
     _logger.warning('Failed to update the context menu devices', e, stackTrace);
   }
@@ -213,22 +231,80 @@ bool _writeContextMenu({required bool quickSend}) {
   );
 
   try {
-    _writeVerb(classes, ['*', 'shell', _verbKey], title: title, icon: icon, executable: executable, quickSend: quickSend);
-    _writeVerb(classes, ['Directory', 'shell', _verbKey], title: title, icon: icon, executable: executable, quickSend: quickSend);
-    _writeVerb(
-      classes,
-      ['Directory', 'Background', 'shell', _verbKey],
-      title: title,
-      icon: icon,
-      executable: executable,
-      quickSend: quickSend,
-      background: true,
-    );
-    // 让级联菜单在尚无设备时也有内容，避免出现空子菜单。
-    _writeDeviceEntries(classes, quickSend: quickSend, entries: const []);
+    for (final path in _verbPaths) {
+      _writeVerb(
+        classes,
+        path,
+        title: title,
+        icon: icon,
+        executable: executable,
+        quickSend: quickSend,
+        background: path[1] == 'Background',
+      );
+    }
+    if (quickSend) {
+      // 保留上一次写入的设备列表；发现列表变化由定时器/设置页补齐。
+      _ensureDeviceRoots(classes);
+    } else {
+      _writeDeviceEntries(classes, quickSend: false, entries: const []);
+    }
     return true;
   } finally {
     classes.close();
+  }
+}
+
+/// 只保证两个设备根键存在，不清空已有内容。
+void _ensureDeviceRoots(RegistryKey classes) {
+  for (final rootKey in [_devicesKey, _backgroundDevicesKey]) {
+    final root = _createKeyPath(classes, [rootKey]);
+    try {
+      root.createKey('shell').close();
+    } finally {
+      root.close();
+    }
+  }
+}
+
+/// 三个父键是否已经是目标形态（普通动词或级联菜单）。
+///
+/// 形态没变时不需要 `SHChangeNotify`，否则每次启动/切换都会让桌面刷新。
+bool _menuStructureMatches({required bool quickSend}) {
+  for (final path in _verbPaths) {
+    final RegistryKey verb;
+    try {
+      verb = Registry.openPath(
+        RegistryHive.currentUser,
+        path: 'Software\\Classes\\${path.join('\\')}',
+        desiredAccessRights: AccessRights.readOnly,
+      );
+    } catch (_) {
+      return false;
+    }
+
+    try {
+      final extended = verb.getStringValue('ExtendedSubCommandsKey');
+      final hasCommand = _keyExists('Software\\Classes\\${[...path, 'command'].join('\\')}');
+      if (quickSend ? (extended == null || hasCommand) : (extended != null || !hasCommand)) {
+        return false;
+      }
+    } finally {
+      verb.close();
+    }
+  }
+  return true;
+}
+
+bool _keyExists(String path) {
+  try {
+    Registry.openPath(
+      RegistryHive.currentUser,
+      path: path,
+      desiredAccessRights: AccessRights.readOnly,
+    ).close();
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 
@@ -283,15 +359,24 @@ void _writeDeviceEntries(
   required bool quickSend,
   required List<DeviceMenuEntry> entries,
 }) {
+  final signature = quickSend
+      ? 'on\n${entries.map((entry) => '${entry.fingerprint}\u0002${entry.displayAlias}\u0002${entry.favorite}').join('\n')}'
+      : 'off';
+  if (signature == _lastDeviceSignature) {
+    return;
+  }
+
   if (!quickSend) {
     _deleteKeySilently(classes, _devicesKey);
     _deleteKeySilently(classes, _backgroundDevicesKey);
+    _lastDeviceSignature = signature;
     return;
   }
 
   final executable = Platform.resolvedExecutable;
   _rewriteDeviceRoot(classes, rootKey: _devicesKey, entries: entries, executable: executable, pathToken: '%1');
   _rewriteDeviceRoot(classes, rootKey: _backgroundDevicesKey, entries: entries, executable: executable, pathToken: '%V');
+  _lastDeviceSignature = signature;
 }
 
 void _rewriteDeviceRoot(
@@ -357,11 +442,12 @@ bool _deleteContextMenu() {
   );
 
   try {
-    _deleteVerb(classes, ['*', 'shell', _verbKey]);
-    _deleteVerb(classes, ['Directory', 'shell', _verbKey]);
-    _deleteVerb(classes, ['Directory', 'Background', 'shell', _verbKey]);
+    for (final path in _verbPaths) {
+      _deleteVerb(classes, path);
+    }
     _deleteKeySilently(classes, _devicesKey);
     _deleteKeySilently(classes, _backgroundDevicesKey);
+    _lastDeviceSignature = 'off';
     return true;
   } finally {
     classes.close();
