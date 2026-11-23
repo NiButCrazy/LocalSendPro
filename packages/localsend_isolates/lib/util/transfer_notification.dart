@@ -222,20 +222,27 @@ class TransferNotification {
   /// [outcome] keeps the Windows window visible for the configured duration and
   /// shows the matching text instead of hiding it immediately. Without an outcome
   /// (e.g. the user closing the progress page) the window hides right away.
-  static void stop(String sessionId, {TransferOutcome? outcome}) {
-    final hadPending = _pending.remove(sessionId) != null;
+  ///
+  /// [text] is the extra line shown when a session fails before a transfer exists
+  /// (busy, declined, network error), so the waiting window does not just vanish.
+  static void stop(String sessionId, {TransferOutcome? outcome, String? text}) {
+    final pending = _pending.remove(sessionId);
     final transfer = _transfers.remove(sessionId);
     if (transfer == null) {
       // Unknown session: keep the old behavior of not touching a window that
       // belongs to another flow (e.g. a pending receive request).
-      if (!hadPending) {
+      if (pending == null) {
         return;
       }
       if (_pending.isNotEmpty) {
         _showProgressWindow();
       } else if (_transfers.isEmpty) {
         _cancelCompletionTimer();
-        TransferProgressWindow.hide();
+        if (outcome == null) {
+          TransferProgressWindow.hide();
+        } else {
+          _showPendingOutcome(pending, outcome, text: text);
+        }
       }
       return;
     }
@@ -255,6 +262,44 @@ class TransferNotification {
       ForegroundService.updateNotification(title: snapshot.title, text: snapshot.text, progress: snapshot.percentage);
       _updateProgressWindow(snapshot);
     }
+  }
+
+  /// Shows why a request ended before the transfer existed, then hides after the
+  /// completion display duration.
+  static void _showPendingOutcome(_PendingTransfer pending, TransferOutcome outcome, {String? text}) {
+    _cancelCompletionTimer();
+
+    if (_mainWindowActive && !pending.forceWindow) {
+      TransferProgressWindow.hideProgressOnly();
+      return;
+    }
+
+    var remainingSeconds = _completionDisplayDuration.inSeconds;
+    if (remainingSeconds <= 0) {
+      TransferProgressWindow.hide();
+      return;
+    }
+
+    final title = _outcomeTitleFor(outcome);
+    TransferProgressWindow.show(title: title, text: text ?? '', percentage: 0);
+
+    _completionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      remainingSeconds--;
+      if (remainingSeconds <= 0) {
+        timer.cancel();
+        _completionTimer = null;
+        TransferProgressWindow.hide();
+      }
+    });
+  }
+
+  static String _outcomeTitleFor(TransferOutcome outcome) {
+    final strings = _requiredStrings;
+    return switch (outcome) {
+      TransferOutcome.completed => strings.titleCompleted,
+      TransferOutcome.failed => strings.titleFailed,
+      TransferOutcome.canceled => strings.titleCanceled,
+    };
   }
 
   static void _showOutcome(_Transfer transfer, TransferOutcome outcome) {

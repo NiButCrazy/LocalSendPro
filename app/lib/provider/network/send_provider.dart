@@ -333,7 +333,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   status: SessionStatus.declined,
                 ),
               );
-              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
+              _stopWaitingNotification(
+                sessionId,
+                enabled: notifyWhileWaiting,
+                outcome: TransferOutcome.failed,
+                text: t.sendPage.rejected,
+              );
               return;
             case 409:
               state = state.updateSession(
@@ -342,7 +347,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   status: SessionStatus.recipientBusy,
                 ),
               );
-              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
+              _stopWaitingNotification(
+                sessionId,
+                enabled: notifyWhileWaiting,
+                outcome: TransferOutcome.failed,
+                text: t.sendPage.busy,
+              );
               return;
             case 429:
               state = state.updateSession(
@@ -351,7 +361,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   status: SessionStatus.tooManyAttempts,
                 ),
               );
-              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
+              _stopWaitingNotification(
+                sessionId,
+                enabled: notifyWhileWaiting,
+                outcome: TransferOutcome.failed,
+                text: t.sendPage.tooManyAttempts,
+              );
               return;
             default:
               state = state.updateSession(
@@ -361,7 +376,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   errorMessage: e.humanErrorMessage,
                 ),
               );
-              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
+              _stopWaitingNotification(
+                sessionId,
+                enabled: notifyWhileWaiting,
+                outcome: TransferOutcome.failed,
+                text: e.humanErrorMessage,
+              );
               return;
           }
         } catch (e) {
@@ -375,7 +395,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
               errorMessage: e.humanErrorMessage,
             ),
           );
-          _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
+          _stopWaitingNotification(
+            sessionId,
+            enabled: notifyWhileWaiting,
+            outcome: TransferOutcome.failed,
+            text: e.humanErrorMessage,
+          );
           return;
         }
       } while (invalidPin);
@@ -415,7 +440,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
             errorMessage: e.humanErrorMessage,
           ),
         );
-        _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
+        _stopWaitingNotification(
+          sessionId,
+          enabled: notifyWhileWaiting,
+          outcome: TransferOutcome.failed,
+          text: e.humanErrorMessage,
+        );
         return;
       }
     }
@@ -497,12 +527,17 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     await _sendLoop(sessionId, sendingFiles);
   }
 
-  /// 快速发送的等待窗口在请求提前结束时必须收起，否则会一直停在“等待响应”。
-  void _stopWaitingNotification(String sessionId, {required bool enabled, required TransferOutcome outcome}) {
+  /// 快速发送的请求在开始传输前结束时，带上失败原因短暂显示结果，而不是让窗口静默消失。
+  void _stopWaitingNotification(
+    String sessionId, {
+    required bool enabled,
+    required TransferOutcome outcome,
+    String? text,
+  }) {
     if (!enabled) {
       return;
     }
-    TransferNotification.stop(sessionId, outcome: outcome);
+    TransferNotification.stop(sessionId, outcome: outcome, text: text);
   }
 
   /// Reports the total session progress to the foreground service notification,

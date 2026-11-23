@@ -260,6 +260,38 @@ void main() {
     expect(calls.map((call) => call.method), contains('hideProgress'));
   });
 
+  test('shows why a pending request failed before it vanishes', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.init(
+      const NotificationStrings(
+        titleReceiving: 'Receiving files',
+        titleSending: 'Sending files',
+        titleCompleted: 'Transfer complete',
+        titleFailed: 'Transfer failed',
+        titleCanceled: 'Transfer canceled',
+        completionCountdown: _completionCountdown,
+        remainingTimeMinutes: _remainingMinutes,
+        remainingTimeLong: _remainingLong,
+      ),
+      completionDisplayDuration: const Duration(seconds: 1),
+    );
+
+    TransferNotification.startPending(sessionId: 'a', title: 'My PC', text: 'Waiting for response…');
+    calls.clear();
+
+    TransferNotification.stop('a', outcome: TransferOutcome.failed, text: 'The recipient is busy');
+    await Future<void>.delayed(Duration.zero);
+
+    final shown = calls.firstWhere((call) => call.method == 'showProgress');
+    final arguments = shown.arguments as Map<Object?, Object?>;
+    expect(arguments['title'], 'Transfer failed');
+    expect(arguments['text'], 'The recipient is busy');
+    expect(calls.map((call) => call.method), isNot(contains('hideProgress')));
+
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    expect(calls.map((call) => call.method), contains('hideProgress'));
+  });
+
   test('does nothing on non-Windows platforms', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
