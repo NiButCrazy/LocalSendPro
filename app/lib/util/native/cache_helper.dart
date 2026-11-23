@@ -19,6 +19,15 @@ final _logger = Logger('ClearCacheAction');
 class ClearCacheAction extends AsyncGlobalAction {
   @override
   Future<void> reduce() async {
+    // The cleanup below only targets mobile (file picker / photo manager / app
+    // temp) and mobile is also the only place where a background isolate can
+    // route platform messages. Desktop engines cannot, which made the platform
+    // message callback throw `type 'Null' is not a subtype of type
+    // 'List<dynamic>'` whenever the selection was cleared.
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return;
+    }
+
     // The token statement must be outside the lambda because it must be executed on the root isolate.
     final token = ServicesBinding.rootIsolateToken!;
     await Isolate.run(() => _clear(token));

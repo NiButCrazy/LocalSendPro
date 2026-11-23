@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:localsend_app/util/native/cache_helper.dart';
-import 'package:test/test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('cache cleanup completes only after temporary file deletion', () async {
     final file = _ControlledFile();
     var completed = false;
@@ -19,6 +21,16 @@ void main() {
       await cleanup;
     }
     expect(completed, isTrue);
+  });
+
+  test('does not spawn the platform-message isolate on desktop', () async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      return;
+    }
+
+    // Desktop engines cannot route platform messages from a background isolate.
+    // Before the guard, this threw inside the isolate's message callback.
+    await ClearCacheAction().reduce();
   });
 }
 
