@@ -244,7 +244,8 @@ class TransferNotification {
   }
 
   /// Shows why a request ended before the transfer existed, then hides after the
-  /// completion display duration.
+  /// completion display duration. The countdown is part of the body, like the
+  /// normal transfer outcome.
   static void _showPendingOutcome(TransferOutcome outcome, {String? text}) {
     _cancelCompletionTimer();
 
@@ -260,7 +261,11 @@ class TransferNotification {
     }
 
     final title = _outcomeTitleFor(outcome);
-    TransferProgressWindow.show(title: title, text: text ?? '', percentage: 0);
+    TransferProgressWindow.show(
+      title: title,
+      text: _pendingOutcomeText(text, remainingSeconds),
+      percentage: 0,
+    );
 
     _completionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       remainingSeconds--;
@@ -268,8 +273,25 @@ class TransferNotification {
         timer.cancel();
         _completionTimer = null;
         TransferProgressWindow.hide();
+        return;
       }
+      if (_mainWindowActive) {
+        return;
+      }
+      TransferProgressWindow.update(
+        title: title,
+        text: _pendingOutcomeText(text, remainingSeconds),
+        percentage: 0,
+      );
     });
+  }
+
+  static String _pendingOutcomeText(String? text, int remainingSeconds) {
+    final countdown = _requiredStrings.completionCountdown(seconds: remainingSeconds);
+    if (text == null || text.isEmpty) {
+      return countdown;
+    }
+    return '$text\n$countdown';
   }
 
   static String _outcomeTitleFor(TransferOutcome outcome) {

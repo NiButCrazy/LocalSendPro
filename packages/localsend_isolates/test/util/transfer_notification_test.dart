@@ -286,7 +286,8 @@ void main() {
     final shown = calls.firstWhere((call) => call.method == 'showProgress');
     final arguments = shown.arguments as Map<Object?, Object?>;
     expect(arguments['title'], 'Transfer failed');
-    expect(arguments['text'], 'The recipient is busy');
+    expect(arguments['text'], contains('The recipient is busy'));
+    expect(arguments['text'], contains('1s left'));
     expect(calls.map((call) => call.method), isNot(contains('hideProgress')));
 
     await Future<void>.delayed(const Duration(milliseconds: 1100));
