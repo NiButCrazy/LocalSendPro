@@ -48,7 +48,7 @@ class DeviceMenuEntry {
 ///
 /// [quickSend] 为 true 时父键变成级联菜单，设备列表由 [updateContextMenuDevices] 填充；
 /// 为 false 时保持经典的单一动词。
-Future<bool> enableContextMenu({required bool quickSend, bool showIcon = true}) async {
+Future<bool> enableContextMenu({required bool quickSend, bool showIcon = true, String? menuLabel}) async {
   if (defaultTargetPlatform != TargetPlatform.windows) {
     return false;
   }
@@ -56,8 +56,8 @@ Future<bool> enableContextMenu({required bool quickSend, bool showIcon = true}) 
   try {
     // 只有父键在“普通动词”和“级联菜单”之间切换（或首次写入）时才需要通知外壳。
     // 每次启动都刷新会让桌面图标/关联闪一下。
-    final structureChanged = !_menuStructureMatches(quickSend: quickSend, showIcon: showIcon);
-    final menuWritten = _writeContextMenu(quickSend: quickSend, showIcon: showIcon);
+    final structureChanged = !_menuStructureMatches(quickSend: quickSend, showIcon: showIcon, menuLabel: menuLabel);
+    final menuWritten = _writeContextMenu(quickSend: quickSend, showIcon: showIcon, menuLabel: menuLabel);
     try {
       await _createSendToShortcut();
     } catch (e, stackTrace) {
@@ -115,16 +115,16 @@ Future<bool> isContextMenuEnabled() async {
 
 /// Adds the menu for installs that only had the SendTo shortcut before, and
 /// keeps the command pointing at the current executable after an update.
-Future<void> migrateContextMenu({required bool quickSend, bool showIcon = true}) async {
+Future<void> migrateContextMenu({required bool quickSend, bool showIcon = true, String? menuLabel}) async {
   if (defaultTargetPlatform != TargetPlatform.windows) {
     return;
   }
   if (await isContextMenuEnabled()) {
-    await enableContextMenu(quickSend: quickSend, showIcon: showIcon);
+    await enableContextMenu(quickSend: quickSend, showIcon: showIcon, menuLabel: menuLabel);
     return;
   }
   if (await File(_getWindowsFilePath(_windowsFileName)).exists()) {
-    await enableContextMenu(quickSend: quickSend, showIcon: showIcon);
+    await enableContextMenu(quickSend: quickSend, showIcon: showIcon, menuLabel: menuLabel);
   }
 }
 
@@ -223,9 +223,9 @@ String buildScanCommand({required String executable, required String pathToken})
   return '"$executable" --hidden --scan "$pathToken"';
 }
 
-bool _writeContextMenu({required bool quickSend, required bool showIcon}) {
+bool _writeContextMenu({required bool quickSend, required bool showIcon, String? menuLabel}) {
   final executable = Platform.resolvedExecutable;
-  final title = _menuTitle();
+  final title = _menuTitle(custom: menuLabel);
   final icon = '"$executable",0';
   final classes = Registry.openPath(
     RegistryHive.currentUser,
@@ -273,7 +273,7 @@ void _ensureDeviceRoots(RegistryKey classes) {
 /// 三个父键是否已经是目标形态（普通动词或级联菜单）。
 ///
 /// 形态没变时不需要 `SHChangeNotify`，否则每次启动/切换都会让桌面刷新。
-bool _menuStructureMatches({required bool quickSend, required bool showIcon}) {
+bool _menuStructureMatches({required bool quickSend, required bool showIcon, String? menuLabel}) {
   for (final path in _verbPaths) {
     final RegistryKey verb;
     try {
@@ -294,6 +294,11 @@ bool _menuStructureMatches({required bool quickSend, required bool showIcon}) {
         return false;
       }
       if (hasIcon != showIcon) {
+        return false;
+      }
+      final expectedTitle = _menuTitle(custom: menuLabel);
+      final actualTitle = quickSend ? verb.getStringValue('MUIVerb') : verb.getStringValue('');
+      if (actualTitle != expectedTitle) {
         return false;
       }
     } finally {
@@ -525,7 +530,11 @@ RegistryKey _createKeyPath(RegistryKey root, List<String> segments) {
   return current;
 }
 
-String _menuTitle() {
+String _menuTitle({String? custom}) {
+  final label = custom?.trim();
+  if (label != null && label.isNotEmpty) {
+    return escapeMenuLabel(label);
+  }
   final locale = Platform.localeName.toLowerCase();
   return locale.startsWith('zh') ? '使用 LocalSend 发送' : 'Send with LocalSend';
 }

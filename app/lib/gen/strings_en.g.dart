@@ -572,6 +572,15 @@ class Translations$contextMenuPage$en {
   /// en: 'Show the app icon next to the LocalSend menu entry.'
   String get showIconDescription => 'Show the app icon next to the LocalSend menu entry.';
 
+  /// en: 'Context menu text'
+  String get menuLabel => 'Context menu text';
+
+  /// en: 'Leave empty to use the default label.'
+  String get menuLabelDescription => 'Leave empty to use the default label.';
+
+  /// en: 'Send with LocalSend'
+  String get defaultMenuLabel => 'Send with LocalSend';
+
   /// en: 'Looking for device…'
   String get searching => 'Looking for device…';
 

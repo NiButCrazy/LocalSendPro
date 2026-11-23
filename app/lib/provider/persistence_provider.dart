@@ -111,6 +111,7 @@ const _advancedSettingsKey = 'ls_advanced_settings';
 const _whatsNewKey = 'ls_whats_new';
 const _contextMenuQuickSend = 'ls_context_menu_quick_send';
 const _contextMenuIcon = 'ls_context_menu_icon';
+const _contextMenuLabel = 'ls_context_menu_label';
 
 final persistenceProvider = Provider<PersistenceService>((ref) {
   throw Exception('persistenceProvider not initialized');
@@ -615,6 +616,20 @@ class PersistenceService {
 
   Future<void> setContextMenuIcon(bool value) async {
     await _prefs.setBool(_contextMenuIcon, value);
+  }
+
+  /// Custom context-menu text; null/empty means the localized default.
+  String? getContextMenuLabel() {
+    final value = _prefs.getString(_contextMenuLabel)?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  Future<void> setContextMenuLabel(String? value) async {
+    if (value == null || value.trim().isEmpty) {
+      await _prefs.remove(_contextMenuLabel);
+    } else {
+      await _prefs.setString(_contextMenuLabel, value.trim());
+    }
   }
 
   QuickSaveMode getQuickSave() {

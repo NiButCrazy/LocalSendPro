@@ -43,8 +43,9 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
   Future<void> _setShowInContextMenu(bool value) async {
     final quickSend = ref.read(settingsProvider).contextMenuQuickSend;
     final showIcon = ref.read(settingsProvider).contextMenuIcon;
+    final menuLabel = ref.read(settingsProvider).contextMenuLabel;
     setState(() => _busy = true);
-    final success = value ? await enableContextMenu(quickSend: quickSend, showIcon: showIcon) : await disableContextMenu();
+    final success = value ? await enableContextMenu(quickSend: quickSend, showIcon: showIcon, menuLabel: menuLabel) : await disableContextMenu();
     if (!mounted) {
       return;
     }
@@ -63,8 +64,9 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
 
   Future<void> _setQuickSend(bool value) async {
     final showIcon = ref.read(settingsProvider).contextMenuIcon;
+    final menuLabel = ref.read(settingsProvider).contextMenuLabel;
     setState(() => _busy = true);
-    final success = await enableContextMenu(quickSend: value, showIcon: showIcon);
+    final success = await enableContextMenu(quickSend: value, showIcon: showIcon, menuLabel: menuLabel);
     if (!mounted) {
       return;
     }
@@ -88,8 +90,9 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
       return;
     }
     final quickSend = ref.read(settingsProvider).contextMenuQuickSend;
+    final menuLabel = ref.read(settingsProvider).contextMenuLabel;
     setState(() => _busy = true);
-    final success = await enableContextMenu(quickSend: quickSend, showIcon: value);
+    final success = await enableContextMenu(quickSend: quickSend, showIcon: value, menuLabel: menuLabel);
     if (!mounted) {
       return;
     }
@@ -104,11 +107,68 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
     }
   }
 
+  Future<void> _editMenuLabel() async {
+    final current = ref.read(settingsProvider).contextMenuLabel ?? '';
+    final controller = TextEditingController(text: current);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(t.contextMenuPage.menuLabel),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: t.contextMenuPage.defaultMenuLabel,
+              helperText: t.contextMenuPage.menuLabelDescription,
+            ),
+            onSubmitted: (text) => Navigator.of(dialogContext).pop(text),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(t.general.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: Text(t.general.save),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (value == null || !mounted) {
+      return;
+    }
+    final trimmed = value.trim();
+    final label = trimmed.isEmpty ? null : trimmed;
+    if ((_showInContextMenu ?? false)) {
+      final quickSend = ref.read(settingsProvider).contextMenuQuickSend;
+      final showIcon = ref.read(settingsProvider).contextMenuIcon;
+      setState(() => _busy = true);
+      final success = await enableContextMenu(quickSend: quickSend, showIcon: showIcon, menuLabel: label);
+      if (!mounted) {
+        return;
+      }
+      if (!success) {
+        setState(() => _busy = false);
+        context.showSnackBar(t.general.error);
+        return;
+      }
+    }
+    await ref.notifier(settingsProvider).setContextMenuLabel(label);
+    if (mounted) {
+      setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
     final quickSend = context.watch(settingsProvider.select((settings) => settings.contextMenuQuickSend));
     final showIcon = context.watch(settingsProvider.select((settings) => settings.contextMenuIcon));
+    final menuLabel = context.watch(settingsProvider.select((settings) => settings.contextMenuLabel));
     final enabled = _showInContextMenu;
     return Scaffold(
       appBar: AppBar(
@@ -124,6 +184,13 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
                   subtitle: Text(t.contextMenuPage.enableDescription),
                   value: enabled,
                   onChanged: _busy ? null : _setShowInContextMenu,
+                ),
+                ListTile(
+                  title: Text(t.contextMenuPage.menuLabel),
+                  subtitle: Text(menuLabel ?? t.contextMenuPage.defaultMenuLabel),
+                  trailing: const Icon(Icons.edit_outlined),
+                  enabled: !_busy,
+                  onTap: _busy ? null : _editMenuLabel,
                 ),
                 SwitchListTile.adaptive(
                   title: Text(t.contextMenuPage.quickSend),

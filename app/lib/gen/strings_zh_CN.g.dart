@@ -497,6 +497,12 @@ class Translations$contextMenuPage$zh_CN extends Translations$contextMenuPage$en
   @override
   String get showIconDescription => '在 LocalSend 菜单项旁显示应用图标。';
   @override
+  String get menuLabel => '右键菜单文本';
+  @override
+  String get menuLabelDescription => '留空则使用默认文本。';
+  @override
+  String get defaultMenuLabel => '使用 LocalSend 发送';
+  @override
   String get searching => '正在查找设备…';
   @override
   String get scanning => '正在查找附近设备…';

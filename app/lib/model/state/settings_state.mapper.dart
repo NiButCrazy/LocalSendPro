@@ -221,6 +221,11 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     'contextMenuIcon',
     _$contextMenuIcon,
   );
+  static String? _$contextMenuLabel(SettingsState v) => v.contextMenuLabel;
+  static const Field<SettingsState, String> _f$contextMenuLabel = Field(
+    'contextMenuLabel',
+    _$contextMenuLabel,
+  );
 
   @override
   final MappableFields<SettingsState> fields = const {
@@ -264,6 +269,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     #advancedSettings: _f$advancedSettings,
     #contextMenuQuickSend: _f$contextMenuQuickSend,
     #contextMenuIcon: _f$contextMenuIcon,
+    #contextMenuLabel: _f$contextMenuLabel,
   };
 
   static SettingsState _instantiate(DecodingData data) {
@@ -308,6 +314,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
       advancedSettings: data.dec(_f$advancedSettings),
       contextMenuQuickSend: data.dec(_f$contextMenuQuickSend),
       contextMenuIcon: data.dec(_f$contextMenuIcon),
+      contextMenuLabel: data.dec(_f$contextMenuLabel),
     );
   }
 
@@ -418,6 +425,7 @@ abstract class SettingsStateCopyWith<$R, $In extends SettingsState, $Out>
     bool? advancedSettings,
     bool? contextMenuQuickSend,
     bool? contextMenuIcon,
+    String? contextMenuLabel,
   });
   SettingsStateCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -490,6 +498,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
     bool? advancedSettings,
     bool? contextMenuQuickSend,
     bool? contextMenuIcon,
+    Object? contextMenuLabel = $none,
   }) => $apply(
     FieldCopyWithData({
       if (showToken != null) #showToken: showToken,
@@ -540,6 +549,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       if (contextMenuQuickSend != null)
         #contextMenuQuickSend: contextMenuQuickSend,
       if (contextMenuIcon != null) #contextMenuIcon: contextMenuIcon,
+      if (contextMenuLabel != $none) #contextMenuLabel: contextMenuLabel,
     }),
   );
   @override
@@ -608,6 +618,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       or: $value.contextMenuQuickSend,
     ),
     contextMenuIcon: data.get(#contextMenuIcon, or: $value.contextMenuIcon),
+    contextMenuLabel: data.get(#contextMenuLabel, or: $value.contextMenuLabel),
   );
 
   @override

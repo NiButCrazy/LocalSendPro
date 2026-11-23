@@ -51,6 +51,7 @@ class SettingsState with SettingsStateMappable {
   final bool advancedSettings;
   final bool contextMenuQuickSend; // list nearby devices in the Windows context menu submenu
   final bool contextMenuIcon; // show the app icon on the context menu entry
+  final String? contextMenuLabel; // custom context-menu text; null = default
 
   const SettingsState({
     required this.showToken,
@@ -93,5 +94,6 @@ class SettingsState with SettingsStateMappable {
     required this.advancedSettings,
     required this.contextMenuQuickSend,
     required this.contextMenuIcon,
+    required this.contextMenuLabel,
   });
 }
