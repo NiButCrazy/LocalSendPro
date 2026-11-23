@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/cross_file.dart';
 import 'package:localsend_app/model/persistence/transfer_history_entry.dart';
 import 'package:localsend_app/model/send_mode.dart';
@@ -16,7 +16,7 @@ import 'package:localsend_app/provider/http_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/transfer_history_provider.dart';
-import 'package:localsend_app/widget/dialogs/pin_dialog.dart';
+import 'package:localsend_app/util/native/pin_prompt.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
 import 'package:localsend_isolates/model/dto/file_dto.dart';
@@ -87,11 +87,16 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
   /// Starts a session.
   /// If [background] is true, then the session closes itself on success and no pages will be open
   /// If [background] is false, then this method will open pages by itself and waits for user input to close the session.
+  ///
+  /// [notifyWhileWaiting] shows the native waiting window from the moment the request is sent
+  /// (the context menu needs it because the main window stays hidden) and uses the native PIN
+  /// prompt instead of the in-app dialog.
   Future<void> startSession({
     required Device target,
     required List<CrossFile> files,
     required bool background,
     String? sessionIdOverride,
+    bool notifyWhileWaiting = false,
   }) async {
     // Pinned to the device the user picked, so the request is not sent at all
     // if someone else answers on that address.
@@ -156,6 +161,16 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
           statuses: {for (final f in selectedFiles) f.id: FileStatus.queue},
         );
 
+    if (notifyWhileWaiting) {
+      // 主窗口保持隐藏，先显示原生等待窗口。
+      TransferNotification.startPending(
+        sessionId: sessionId,
+        title: target.alias,
+        text: t.sendPage.waiting,
+        forceWindow: true,
+      );
+    }
+
     if (!background) {
       // ignore: use_build_context_synchronously, unawaited_futures
       Routerino.context.push(
@@ -202,6 +217,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
 
           if (state[sessionId] == null) {
             // session has been canceled while calculating the checksums
+            _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.canceled);
             return;
           }
 
@@ -221,6 +237,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     final hashedState = state[sessionId];
     if (hashedState == null) {
       // session has been canceled while calculating the checksums
+      _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.canceled);
       return;
     }
 
@@ -284,12 +301,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
               // wait until animation is finished
               await sleepAsync(500);
 
-              pin = await showDialog<String>(
+              pin = await PinPrompt.show(
                 context: Routerino.context, // ignore: use_build_context_synchronously
-                builder: (_) => PinDialog(
-                  obscureText: true,
-                  showInvalidPin: !pinFirstAttempt,
-                ),
+                title: t.dialogs.pin.title,
+                text: '${target.alias}\n${t.sendPage.pinRequired}',
+                invalid: !pinFirstAttempt,
+                forceNative: notifyWhileWaiting,
               );
 
               pinFirstAttempt = false;
@@ -301,7 +318,12 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                     status: SessionStatus.canceledBySender,
                   ),
                 );
+                _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.canceled);
                 return;
+              }
+              // PIN 已提交，等待窗口继续显示“等待响应”。
+              if (notifyWhileWaiting) {
+                TransferNotification.restorePending(sessionId);
               }
               break;
             case 403:
@@ -311,6 +333,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   status: SessionStatus.declined,
                 ),
               );
+              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
               return;
             case 409:
               state = state.updateSession(
@@ -319,6 +342,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   status: SessionStatus.recipientBusy,
                 ),
               );
+              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
               return;
             case 429:
               state = state.updateSession(
@@ -327,6 +351,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   status: SessionStatus.tooManyAttempts,
                 ),
               );
+              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
               return;
             default:
               state = state.updateSession(
@@ -336,6 +361,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                   errorMessage: e.humanErrorMessage,
                 ),
               );
+              _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
               return;
           }
         } catch (e) {
@@ -349,6 +375,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
               errorMessage: e.humanErrorMessage,
             ),
           );
+          _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
           return;
         }
       } while (invalidPin);
@@ -357,6 +384,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     }
 
     if (response == null) {
+      _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
       return;
     }
 
@@ -377,6 +405,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
         );
       } catch (e) {
         if (_isCanceledBySender(sessionId)) {
+          _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.canceled);
           return;
         }
         state = state.updateSession(
@@ -386,6 +415,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
             errorMessage: e.humanErrorMessage,
           ),
         );
+        _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.failed);
         return;
       }
     }
@@ -407,6 +437,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
         ref.global.dispatch(NavigateAction.popUntilRoot());
       }
 
+      _stopWaitingNotification(sessionId, enabled: notifyWhileWaiting, outcome: TransferOutcome.completed);
       closeSession(sessionId);
       return;
     }
@@ -461,9 +492,17 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
 
     // Keep the process alive for the whole transfer. Started here, while the app is still in the
     // foreground, because Android 12+ rejects starting a foreground service from the background.
-    TransferNotification.start(sessionId: sessionId, receiving: false);
+    TransferNotification.start(sessionId: sessionId, receiving: false, forceWindow: notifyWhileWaiting);
 
     await _sendLoop(sessionId, sendingFiles);
+  }
+
+  /// 快速发送的等待窗口在请求提前结束时必须收起，否则会一直停在“等待响应”。
+  void _stopWaitingNotification(String sessionId, {required bool enabled, required TransferOutcome outcome}) {
+    if (!enabled) {
+      return;
+    }
+    TransferNotification.stop(sessionId, outcome: outcome);
   }
 
   /// Reports the total session progress to the foreground service notification,

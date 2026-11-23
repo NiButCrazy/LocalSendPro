@@ -57,6 +57,9 @@ class TransferProgressWindow {
   static void Function(String action)? _actionHandler;
   static void Function(List<String> args)? _secondInstanceHandler;
 
+  /// 正在等待原生 PIN 输入框的结果。
+  static Completer<String?>? _pinCompleter;
+
   /// Registers the handler for the native window actions (`accept`, `decline`, `open`, `hide`).
   static void setActionHandler(void Function(String action)? handler) {
     _actionHandler = handler;
@@ -74,7 +77,7 @@ class TransferProgressWindow {
   }
 
   static void _syncMethodCallHandler() {
-    final hasHandler = _actionHandler != null || _secondInstanceHandler != null;
+    final hasHandler = _actionHandler != null || _secondInstanceHandler != null || _pinCompleter != null;
     _channel.setMethodCallHandler(hasHandler ? _handleMethodCall : null);
   }
 
@@ -89,8 +92,27 @@ class TransferProgressWindow {
       if (arguments is List) {
         _secondInstanceHandler?.call(arguments.whereType<String>().toList(growable: false));
       }
+    } else if (call.method == 'onPinResult') {
+      final arguments = call.arguments;
+      String? pin;
+      if (arguments is Map) {
+        final value = arguments['pin'];
+        if (value is String && value.isNotEmpty) {
+          pin = value;
+        }
+      }
+      _completePin(pin);
     }
     return null;
+  }
+
+  static void _completePin(String? pin) {
+    final completer = _pinCompleter;
+    _pinCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(pin);
+    }
+    _syncMethodCallHandler();
   }
 
   /// Shows the waiting state with accept/decline buttons until the transfer starts.
@@ -169,6 +191,9 @@ class TransferProgressWindow {
       return;
     }
 
+    // Hiding cancels a PIN prompt natively; complete it here as well so the
+    // sender never waits on a window that is gone.
+    _completePin(null);
     final wasVisible = _visible;
     _visible = false;
     _lastUpdate = null;
@@ -180,8 +205,70 @@ class TransferProgressWindow {
     }
   }
 
+  /// Hides the progress/waiting state but leaves an open PIN prompt alone.
+  static void hideProgressOnly() {
+    if (!isSupported) {
+      return;
+    }
+
+    final wasVisible = _visible;
+    _visible = false;
+    _lastUpdate = null;
+    _lastTitle = null;
+    _lastText = null;
+    _lastProgress = null;
+    if (wasVisible) {
+      unawaited(_invoke('hideProgressOnly', const {}));
+    }
+  }
+
+  /// Asks the receiver for a PIN in the native window and waits for the answer.
+  ///
+  /// The future completes with `null` when the prompt was canceled, hidden, or a
+  /// receive request took the window over. A previous prompt is canceled.
+  static Future<String?> showPin({
+    required String title,
+    required String text,
+    required bool invalid,
+    required String confirmLabel,
+    required String cancelLabel,
+  }) {
+    if (!isSupported) {
+      return Future<String?>.value(null);
+    }
+
+    _completePin(null);
+    final completer = Completer<String?>();
+    _pinCompleter = completer;
+    _syncMethodCallHandler();
+
+    _visible = true;
+    _lastUpdate = now();
+    _lastTitle = title;
+    _lastText = text;
+    _lastProgress = null;
+    unawaited(() async {
+      try {
+        await _channel.invokeMethod<void>('showPin', {
+          'title': title,
+          'text': text,
+          'invalid': invalid,
+          'confirmLabel': confirmLabel,
+          'cancelLabel': cancelLabel,
+          ..._themeArguments(),
+        });
+      } catch (e) {
+        // 原生窗口不可用时按取消处理，避免发送会话永久等待。
+        _logger.warning('Could not show the PIN prompt', e);
+        _completePin(null);
+      }
+    }());
+    return completer.future;
+  }
+
   @visibleForTesting
   static void resetForTest() {
+    _completePin(null);
     _visible = false;
     _lastUpdate = null;
     _lastTitle = null;

@@ -202,6 +202,64 @@ void main() {
     expect(arguments['progress'], 0.5);
   });
 
+  test('shows the waiting state while the main window is visible if forced', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    // setUp already hid the app window; make it visible again to prove the forcing.
+    TransferNotification.setMainWindowActive(true);
+
+    TransferNotification.startPending(
+      sessionId: 'search:a',
+      title: 'My PC',
+      text: 'Looking for device…',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(calls, hasLength(1));
+    expect(calls.single.method, 'showProgress');
+    final arguments = calls.single.arguments as Map<Object?, Object?>;
+    expect(arguments['title'], 'My PC');
+    expect(arguments['text'], 'Looking for device…');
+    expect(arguments['progress'], 0.0);
+  });
+
+  test('does not show the waiting state while the main window is visible', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.setMainWindowActive(true);
+
+    TransferNotification.startPending(
+      sessionId: 'search:a',
+      title: 'My PC',
+      text: 'Looking for device…',
+      forceWindow: false,
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(calls, isEmpty);
+  });
+
+  test('start replaces the pending state', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.setMainWindowActive(true);
+
+    TransferNotification.startPending(sessionId: 'a', title: 'My PC', text: 'Looking for device…');
+    TransferNotification.start(sessionId: 'a', receiving: false, forceWindow: true);
+    TransferNotification.stop('a');
+    await Future<void>.delayed(Duration.zero);
+
+    // If the pending state had survived, stop would re-show it instead of hiding.
+    expect(calls.map((call) => call.method), contains('hideProgress'));
+  });
+
+  test('stopping a pending session hides the window', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+
+    TransferNotification.startPending(sessionId: 'search:a', title: 'My PC', text: 'Looking for device…');
+    TransferNotification.stop('search:a');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(calls.map((call) => call.method), contains('hideProgress'));
+  });
+
   test('does nothing on non-Windows platforms', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
 

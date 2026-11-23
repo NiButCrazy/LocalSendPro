@@ -55,6 +55,18 @@ bool FlutterWindow::OnCreate() {
             "onWindowAction",
             std::make_unique<flutter::EncodableValue>(arguments));
       });
+  transfer_progress_window_->SetPinHandler(
+      [this](const std::optional<std::string>& pin) {
+        if (!transfer_progress_channel_) {
+          return;
+        }
+        flutter::EncodableMap arguments;
+        arguments[flutter::EncodableValue(std::string("pin"))] =
+            pin ? flutter::EncodableValue(*pin) : flutter::EncodableValue();
+        transfer_progress_channel_->InvokeMethod(
+            "onPinResult",
+            std::make_unique<flutter::EncodableValue>(arguments));
+      });
 
   return true;
 }
@@ -85,6 +97,12 @@ void FlutterWindow::HandleTransferProgressCall(
 
   if (call.method_name() == "hideProgress") {
     transfer_progress_window_->Hide();
+    result->Success();
+    return;
+  }
+
+  if (call.method_name() == "hideProgressOnly") {
+    transfer_progress_window_->HideProgressOnly();
     result->Success();
     return;
   }
@@ -159,6 +177,36 @@ void FlutterWindow::HandleTransferProgressCall(
     }
     transfer_progress_window_->ShowWaiting(*title, *text, *accept_label,
                                            *decline_label);
+    result->Success();
+    return;
+  }
+
+  if (call.method_name() == "showPin") {
+    const auto confirm_it =
+        arguments->find(flutter::EncodableValue(std::string("confirmLabel")));
+    const auto cancel_it =
+        arguments->find(flutter::EncodableValue(std::string("cancelLabel")));
+    if (confirm_it == arguments->end() || cancel_it == arguments->end()) {
+      result->Error("bad_arguments", "Missing confirmLabel or cancelLabel");
+      return;
+    }
+    const auto* confirm_label = std::get_if<std::string>(&confirm_it->second);
+    const auto* cancel_label = std::get_if<std::string>(&cancel_it->second);
+    if (!confirm_label || !cancel_label) {
+      result->Error("bad_arguments",
+                    "confirmLabel and cancelLabel must be strings");
+      return;
+    }
+    bool invalid = false;
+    const auto invalid_it =
+        arguments->find(flutter::EncodableValue(std::string("invalid")));
+    if (invalid_it != arguments->end()) {
+      if (const auto* value = std::get_if<bool>(&invalid_it->second)) {
+        invalid = *value;
+      }
+    }
+    transfer_progress_window_->ShowPin(*title, *text, invalid, *confirm_label,
+                                       *cancel_label);
     result->Success();
     return;
   }

@@ -27,6 +27,9 @@ class TransferNotification {
   TransferNotification._();
 
   static final _transfers = <String, _Transfer>{};
+
+  /// 尚未开始传输的会话（例如右键菜单正在查找设备），窗口显示等待文案。
+  static final _pending = <String, _PendingTransfer>{};
   static NotificationStrings? _strings;
 
   /// How long the Windows window keeps showing the completion state before hiding.
@@ -43,6 +46,8 @@ class TransferNotification {
   ///
   /// The window manager listener calls this on show/hide/minimize/restore. Showing the main
   /// window hides the native progress window; hiding or minimizing it shows the current state.
+  /// Sessions started from the context menu force the native window, so it stays visible even
+  /// while the main window is usable.
   static void setMainWindowActive(bool active) {
     if (_mainWindowActive == active) {
       return;
@@ -50,15 +55,29 @@ class TransferNotification {
     _mainWindowActive = active;
 
     if (_mainWindowActive) {
-      TransferProgressWindow.hide();
+      if (_hasForcedItem) {
+        _showProgressWindow();
+      } else {
+        TransferProgressWindow.hideProgressOnly();
+      }
     } else {
       _showProgressWindow();
     }
   }
 
-  /// Shows the current aggregate state in the native window, unless the main window is visible.
+  /// Whether the main app window is visible and not minimized.
+  static bool get isMainWindowActive => _mainWindowActive;
+
+  static bool get _hasForcedItem =>
+      _transfers.values.any((transfer) => transfer.forceWindow) || _pending.values.any((pending) => pending.forceWindow);
+
+  /// Shows the current aggregate state in the native window, unless the main window is visible
+  /// and nothing forced the window.
   static void _showProgressWindow() {
-    if (_mainWindowActive || _transfers.isEmpty) {
+    if (_transfers.isEmpty && _pending.isEmpty) {
+      return;
+    }
+    if (_mainWindowActive && !_hasForcedItem) {
       return;
     }
     final snapshot = _snapshot();
@@ -67,7 +86,7 @@ class TransferNotification {
 
   /// Forwards progress to the native window, unless the main window is visible.
   static void _updateProgressWindow(({String title, String windowTitle, String text, String windowText, int percentage}) snapshot) {
-    if (_mainWindowActive) {
+    if (_mainWindowActive && !_hasForcedItem) {
       return;
     }
     TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
@@ -91,6 +110,7 @@ class TransferNotification {
   /// Only for tests: forgets every registered transfer.
   static void resetForTest() {
     _transfers.clear();
+    _pending.clear();
     _mainWindowActive = true;
     _cancelCompletionTimer();
   }
@@ -107,13 +127,17 @@ class TransferNotification {
   ///
   /// Must be called while the app is in the foreground: Android 12+ rejects starting a foreground
   /// service from the background.
-  static void start({required String sessionId, required bool receiving}) {
+  ///
+  /// [forceWindow] keeps the native Windows window visible even while the main window is usable,
+  /// which is what a send started from the context menu needs.
+  static void start({required String sessionId, required bool receiving, bool forceWindow = false}) {
+    _pending.remove(sessionId);
     if (_transfers.containsKey(sessionId)) {
       return;
     }
 
     final isFirst = _transfers.isEmpty;
-    _transfers[sessionId] = _Transfer(receiving: receiving);
+    _transfers[sessionId] = _Transfer(receiving: receiving, forceWindow: forceWindow);
 
     if (isFirst) {
       _cancelCompletionTimer();
@@ -124,8 +148,46 @@ class TransferNotification {
         text: snapshot.text,
         progress: snapshot.percentage,
       );
-      _showProgressWindow();
     }
+    _showProgressWindow();
+  }
+
+  /// Shows a waiting state before the transfer exists, e.g. while a device is being discovered.
+  ///
+  /// A pending session is independent from [_transfers], so it never triggers the
+  /// "session already registered" early return of [start].
+  static void startPending({
+    required String sessionId,
+    required String title,
+    required String text,
+    bool forceWindow = true,
+  }) {
+    if (!TransferProgressWindow.isSupported) {
+      return;
+    }
+
+    _pending[sessionId] = _PendingTransfer(title: title, text: text, forceWindow: forceWindow);
+    _cancelCompletionTimer();
+    if (!_mainWindowActive || forceWindow) {
+      TransferProgressWindow.show(title: title, text: text, percentage: 0);
+    }
+  }
+
+  /// Re-shows the waiting state of a pending session, e.g. after a PIN prompt was answered.
+  static void restorePending(String sessionId) {
+    final pending = _pending[sessionId];
+    if (pending == null) {
+      return;
+    }
+    if (!_mainWindowActive || pending.forceWindow) {
+      TransferProgressWindow.show(title: pending.title, text: pending.text, percentage: 0);
+    }
+  }
+
+  /// Hides progress and waiting states without canceling a PIN prompt.
+  static void hideProgressOnly() {
+    _cancelCompletionTimer();
+    TransferProgressWindow.hideProgressOnly();
   }
 
   /// Reports the progress of a single transfer and refreshes the notification.
@@ -161,14 +223,28 @@ class TransferNotification {
   /// shows the matching text instead of hiding it immediately. Without an outcome
   /// (e.g. the user closing the progress page) the window hides right away.
   static void stop(String sessionId, {TransferOutcome? outcome}) {
+    final hadPending = _pending.remove(sessionId) != null;
     final transfer = _transfers.remove(sessionId);
     if (transfer == null) {
+      // Unknown session: keep the old behavior of not touching a window that
+      // belongs to another flow (e.g. a pending receive request).
+      if (!hadPending) {
+        return;
+      }
+      if (_pending.isNotEmpty) {
+        _showProgressWindow();
+      } else if (_transfers.isEmpty) {
+        _cancelCompletionTimer();
+        TransferProgressWindow.hide();
+      }
       return;
     }
 
     if (_transfers.isEmpty) {
       ForegroundService.stop();
-      if (outcome != null) {
+      if (_pending.isNotEmpty) {
+        _showProgressWindow();
+      } else if (outcome != null) {
         _showOutcome(transfer, outcome);
       } else {
         _cancelCompletionTimer();
@@ -185,8 +261,8 @@ class TransferNotification {
     _cancelCompletionTimer();
 
     // Keep the native window out of the way while the user can see the app itself.
-    if (_mainWindowActive) {
-      TransferProgressWindow.hide();
+    if (_mainWindowActive && !transfer.forceWindow) {
+      TransferProgressWindow.hideProgressOnly();
       return;
     }
 
@@ -212,7 +288,7 @@ class TransferNotification {
         TransferProgressWindow.hide();
         return;
       }
-      if (_mainWindowActive) {
+      if (_mainWindowActive && !transfer.forceWindow) {
         return;
       }
       TransferProgressWindow.update(
@@ -305,6 +381,12 @@ class TransferNotification {
   /// 42% (1.2 MB / 3.4 MB)
   /// 0:45 · 1.2 MB/s
   static ({String title, String windowTitle, String text, String windowText, int percentage}) _snapshot() {
+    if (_transfers.isEmpty && _pending.isNotEmpty) {
+      // 还没有传输：显示第一个等待中的会话。
+      final pending = _pending.values.first;
+      return (title: pending.title, windowTitle: pending.title, text: pending.text, windowText: pending.text, percentage: 0);
+    }
+
     int currentBytes = 0;
     int totalBytes = 0;
     int finishedFiles = 0;
@@ -348,11 +430,21 @@ class TransferNotification {
 
 class _Transfer {
   final bool receiving;
+  final bool forceWindow;
   int currentBytes = 0;
   int totalBytes = 0;
   int finishedFiles = 0;
   int totalFiles = 0;
   int? speedInBytes;
 
-  _Transfer({required this.receiving});
+  _Transfer({required this.receiving, required this.forceWindow});
+}
+
+/// 已显示等待窗口、但尚未开始传输的会话。
+class _PendingTransfer {
+  final String title;
+  final String text;
+  final bool forceWindow;
+
+  const _PendingTransfer({required this.title, required this.text, required this.forceWindow});
 }

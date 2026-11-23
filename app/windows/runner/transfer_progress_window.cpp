@@ -15,6 +15,7 @@ constexpr wchar_t kClassName[] = L"LocalSendTransferProgressWindow";
 
 constexpr int kProgressHeight = 112;
 constexpr int kWaitingHeight = 112;
+constexpr int kPinHeight = 220;
 
 constexpr UINT_PTR kAnimationTimerId = 1;
 constexpr int kAnimationIntervalMs = 15;
@@ -70,6 +71,32 @@ std::wstring Utf8ToWide(const std::string& utf8) {
   return result;
 }
 
+std::string WideToUtf8(const std::wstring& wide) {
+  if (wide.empty()) {
+    return std::string();
+  }
+  const int size = WideCharToMultiByte(CP_UTF8, 0, wide.data(),
+                                       static_cast<int>(wide.size()), nullptr,
+                                       0, nullptr, nullptr);
+  if (size <= 0) {
+    return std::string();
+  }
+  std::string result(static_cast<size_t>(size), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()),
+                      result.data(), size, nullptr, nullptr);
+  return result;
+}
+
+// The native window has no access to the Flutter translations, so the PIN error
+// falls back to the system language, like the context menu title does.
+std::wstring PinErrorMessage() {
+  const LANGID language = GetUserDefaultUILanguage();
+  if (PRIMARYLANGID(language) == LANG_CHINESE) {
+    return L"\u9519\u8bef\u7684 PIN\uff0c\u8bf7\u91cd\u8bd5\u3002";
+  }
+  return L"Incorrect PIN. Please try again.";
+}
+
 }  // namespace
 
 TransferProgressWindow::TransferProgressWindow(HWND owner) : owner_(owner) {}
@@ -82,6 +109,13 @@ void TransferProgressWindow::SetActionHandler(
     std::function<void(const std::string&)> handler) {
   action_handler_ = std::move(handler);
 }
+
+void TransferProgressWindow::SetPinHandler(
+    std::function<void(const std::optional<std::string>&)> handler) {
+  pin_handler_ = std::move(handler);
+}
+
+bool TransferProgressWindow::IsPinActive() const { return mode_ == Mode::pin; }
 
 void TransferProgressWindow::SetTheme(bool dark, int background, int foreground,
                                       int accent) {
@@ -101,6 +135,10 @@ void TransferProgressWindow::Show(const std::string& title,
                                   double progress) {
   if (!EnsureCreated()) {
     return;
+  }
+  if (mode_ == Mode::pin) {
+    // The caller replaced the PIN prompt with progress; tell Dart the PIN was canceled.
+    CancelPin();
   }
   mode_ = Mode::progress;
   ResizeForMode();
@@ -123,6 +161,10 @@ void TransferProgressWindow::Update(const std::string& title,
   if (!EnsureCreated()) {
     return;
   }
+  if (mode_ == Mode::pin) {
+    // Progress of other transfers must not overwrite the PIN prompt.
+    return;
+  }
   if (mode_ != Mode::progress) {
     mode_ = Mode::progress;
     ResizeForMode();
@@ -139,6 +181,10 @@ void TransferProgressWindow::ShowWaiting(const std::string& title,
                                          const std::string& decline_label) {
   if (!EnsureCreated()) {
     return;
+  }
+  if (mode_ == Mode::pin) {
+    // An incoming request takes the window over; the sending session is canceled.
+    CancelPin();
   }
   mode_ = Mode::waiting;
   accept_label_ = Utf8ToWide(accept_label);
@@ -157,14 +203,77 @@ void TransferProgressWindow::ShowWaiting(const std::string& title,
   InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+void TransferProgressWindow::ShowPin(const std::string& title,
+                                     const std::string& text, bool invalid,
+                                     const std::string& confirm_label,
+                                     const std::string& cancel_label) {
+  if (!EnsureCreated()) {
+    return;
+  }
+
+  const bool already_pin = mode_ == Mode::pin;
+  if (!already_pin) {
+    mode_ = Mode::pin;
+    // A PIN needs keyboard focus, so the window must be activatable while it is shown.
+    const LONG_PTR ex_style = GetWindowLongPtrW(hwnd_, GWL_EXSTYLE);
+    SetWindowLongPtrW(hwnd_, GWL_EXSTYLE, ex_style & ~static_cast<LONG_PTR>(WS_EX_NOACTIVATE));
+    CreatePinEdit();
+  }
+
+  pin_confirm_label_ = Utf8ToWide(confirm_label);
+  pin_cancel_label_ = Utf8ToWide(cancel_label);
+  pin_error_ = invalid ? PinErrorMessage() : std::wstring();
+
+  SetContent(title, text, 0.0);
+  // SetContent starts the progress bar animation; a PIN window has no bar.
+  KillTimer(hwnd_, kProgressTimerId);
+
+  if (!already_pin) {
+    ResizeForMode();
+  }
+  if (!user_positioned_) {
+    PositionBottomRight();
+  }
+
+  const bool was_visible = IsWindowVisible(hwnd_) != FALSE;
+  SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  if (!was_visible) {
+    StartShowAnimation();
+  }
+  if (pin_edit_) {
+    SetWindowTextW(pin_edit_, L"");
+    ShowWindow(pin_edit_, SW_SHOW);
+  }
+  SetForegroundWindow(hwnd_);
+  if (pin_edit_) {
+    SetFocus(pin_edit_);
+  }
+  InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void TransferProgressWindow::Hide() {
+  if (mode_ == Mode::pin) {
+    // Hiding cancels the prompt, otherwise the Dart future would never complete.
+    CancelPin();
+  }
   if (hwnd_) {
     KillTimer(hwnd_, kProgressTimerId);
   }
   StartHideAnimation();
 }
 
+void TransferProgressWindow::HideProgressOnly() {
+  if (mode_ == Mode::pin) {
+    return;
+  }
+  Hide();
+}
+
 void TransferProgressWindow::Destroy() {
+  // Shutdown: the Dart side is going away, so never invoke the handler.
+  pin_handler_ = nullptr;
+  ExitPinMode();
   if (hwnd_) {
     KillTimer(hwnd_, kProgressTimerId);
     HWND window = hwnd_;
@@ -272,6 +381,11 @@ void TransferProgressWindow::UpdateDpiAndFonts() {
       -MulDiv(10, static_cast<int>(dpi_), 72), 0, 0, 0, FW_NORMAL, FALSE, FALSE,
       FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
       CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+
+  if (pin_edit_ && text_font_) {
+    SendMessageW(pin_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(text_font_),
+                 TRUE);
+  }
 }
 
 void TransferProgressWindow::RecreateBrushes() {
@@ -296,6 +410,9 @@ void TransferProgressWindow::RecreateBrushes() {
   if (primary_button_hover_brush_) {
     DeleteObject(primary_button_hover_brush_);
   }
+  if (pin_field_brush_) {
+    DeleteObject(pin_field_brush_);
+  }
 
   background_brush_ = CreateSolidBrush(background_color_);
   border_brush_ =
@@ -309,6 +426,8 @@ void TransferProgressWindow::RecreateBrushes() {
       CreateSolidBrush(dark_ ? RGB(76, 76, 76) : RGB(224, 224, 224));
   primary_button_hover_brush_ =
       CreateSolidBrush(AdjustColor(accent_color_, -16));
+  pin_field_brush_ =
+      CreateSolidBrush(dark_ ? RGB(45, 45, 45) : RGB(255, 255, 255));
 }
 
 void TransferProgressWindow::PositionBottomRight() {
@@ -376,9 +495,27 @@ void TransferProgressWindow::UpdateLayoutMetrics() {
                      button_top + button_height};
     accept_rect_ = {padding + button_width + gap, button_top, width - padding,
                     button_top + button_height};
+    pin_edit_rect_ = {};
+  } else if (mode_ == Mode::pin) {
+    const int padding = Scale(16);
+    const int gap = Scale(10);
+    const int button_height = Scale(32);
+    const int button_top = height - Scale(14) - button_height;
+    const int button_width = (width - padding * 2 - gap) / 2;
+    decline_rect_ = {padding, button_top, padding + button_width,
+                     button_top + button_height};
+    accept_rect_ = {padding + button_width + gap, button_top, width - padding,
+                    button_top + button_height};
+    pin_edit_rect_ = {padding, Scale(124), width - padding, Scale(150)};
+    if (pin_edit_) {
+      MoveWindow(pin_edit_, pin_edit_rect_.left, pin_edit_rect_.top,
+                 pin_edit_rect_.right - pin_edit_rect_.left,
+                 pin_edit_rect_.bottom - pin_edit_rect_.top, TRUE);
+    }
   } else {
     accept_rect_ = {};
     decline_rect_ = {};
+    pin_edit_rect_ = {};
   }
 }
 
@@ -411,6 +548,8 @@ void TransferProgressWindow::Paint(HDC dc) {
 
   if (mode_ == Mode::waiting) {
     PaintWaiting(memory, width, height);
+  } else if (mode_ == Mode::pin) {
+    PaintPin(memory, width, height);
   } else {
     PaintProgress(memory, width, height);
   }
@@ -481,6 +620,36 @@ void TransferProgressWindow::PaintWaiting(HDC dc, int width, int height) {
 
   PaintButton(dc, decline_rect_, decline_label_, false, hovered_control_ == 2);
   PaintButton(dc, accept_rect_, accept_label_, true, hovered_control_ == 1);
+}
+
+void TransferProgressWindow::PaintPin(HDC dc, int width, int height) {
+  if (small_font_) {
+    SelectObject(dc, small_font_);
+  }
+  SetTextColor(dc, secondary_color_);
+  int y = Scale(38);
+  for (const std::wstring& line : text_lines_) {
+    if (y + Scale(20) > Scale(98)) {
+      break;
+    }
+    RECT line_rect = {Scale(16), y, width - Scale(16), y + Scale(20)};
+    DrawTextW(dc, line.c_str(), -1, &line_rect,
+              DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX |
+                  DT_NOCLIP);
+    y += Scale(20);
+  }
+
+  if (!pin_error_.empty()) {
+    SetTextColor(dc, RGB(209, 52, 56));
+    RECT error_rect = {Scale(16), Scale(98), width - Scale(16), Scale(118)};
+    DrawTextW(dc, pin_error_.c_str(), -1, &error_rect,
+              DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX |
+                  DT_NOCLIP);
+    SetTextColor(dc, secondary_color_);
+  }
+
+  PaintButton(dc, decline_rect_, pin_cancel_label_, false, hovered_control_ == 2);
+  PaintButton(dc, accept_rect_, pin_confirm_label_, true, hovered_control_ == 1);
 }
 
 void TransferProgressWindow::DrawTextPair(HDC dc, const std::wstring& line,
@@ -589,7 +758,7 @@ int TransferProgressWindow::HitTest(POINT point) const {
   if (mouse_inside_ && PtInRect(&close_rect_, point)) {
     return 3;
   }
-  if (mode_ == Mode::waiting) {
+  if (mode_ == Mode::waiting || mode_ == Mode::pin) {
     if (PtInRect(&accept_rect_, point)) {
       return 1;
     }
@@ -618,6 +787,116 @@ void TransferProgressWindow::StartProgressAnimation() {
     return;
   }
   SetTimer(hwnd_, kProgressTimerId, kProgressIntervalMs, nullptr);
+}
+
+LRESULT CALLBACK TransferProgressWindow::PinEditProc(HWND window,
+                                                     UINT message,
+                                                     WPARAM wparam,
+                                                     LPARAM lparam) {
+  auto* self = reinterpret_cast<TransferProgressWindow*>(
+      GetWindowLongPtrW(window, GWLP_USERDATA));
+  if (self) {
+    if (message == WM_KEYDOWN) {
+      if (wparam == VK_RETURN) {
+        self->SubmitPin();
+        return 0;
+      }
+      if (wparam == VK_ESCAPE) {
+        self->CancelPin();
+        return 0;
+      }
+    } else if (message == WM_CHAR && wparam == L'\r') {
+      // The character must not reach the edit control after VK_RETURN was handled.
+      return 0;
+    }
+    if (self->pin_edit_proc_) {
+      return CallWindowProcW(self->pin_edit_proc_, window, message, wparam,
+                             lparam);
+    }
+  }
+  return DefWindowProcW(window, message, wparam, lparam);
+}
+
+void TransferProgressWindow::CreatePinEdit() {
+  if (!hwnd_ || pin_edit_) {
+    return;
+  }
+
+  pin_edit_ = CreateWindowExW(
+      0, L"EDIT", L"",
+      WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP, 0, 0,
+      10, 10, hwnd_, nullptr, GetModuleHandleW(nullptr), nullptr);
+  if (!pin_edit_) {
+    return;
+  }
+
+  SendMessageW(pin_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(text_font_),
+               TRUE);
+  SendMessageW(pin_edit_, EM_SETLIMITTEXT, 32, 0);
+  SendMessageW(pin_edit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
+               MAKELPARAM(Scale(6), Scale(6)));
+  SetWindowLongPtrW(pin_edit_, GWLP_USERDATA,
+                    reinterpret_cast<LONG_PTR>(this));
+  pin_edit_proc_ = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+      pin_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(PinEditProc)));
+}
+
+void TransferProgressWindow::SubmitPin() {
+  if (mode_ != Mode::pin || !pin_edit_) {
+    return;
+  }
+
+  const int length = GetWindowTextLengthW(pin_edit_);
+  if (length <= 0) {
+    // An empty PIN is never submitted; the user can still cancel.
+    return;
+  }
+
+  std::wstring value(static_cast<size_t>(length) + 1, L'\0');
+  GetWindowTextW(pin_edit_, value.data(), length + 1);
+  value.resize(static_cast<size_t>(length));
+
+  auto handler = std::move(pin_handler_);
+  pin_handler_ = nullptr;
+  ExitPinMode();
+  if (handler) {
+    handler(WideToUtf8(value));
+  }
+}
+
+void TransferProgressWindow::CancelPin() {
+  if (mode_ != Mode::pin) {
+    return;
+  }
+
+  auto handler = std::move(pin_handler_);
+  pin_handler_ = nullptr;
+  ExitPinMode();
+  if (handler) {
+    // The sender treats an empty answer as "canceled".
+    handler(std::nullopt);
+  }
+}
+
+void TransferProgressWindow::ExitPinMode() {
+  if (pin_edit_) {
+    ShowWindow(pin_edit_, SW_HIDE);
+    DestroyWindow(pin_edit_);
+    pin_edit_ = nullptr;
+    pin_edit_proc_ = nullptr;
+  }
+  if (hwnd_) {
+    // Back to a non-activating popup: only the PIN prompt needs focus.
+    const LONG_PTR ex_style = GetWindowLongPtrW(hwnd_, GWL_EXSTYLE);
+    SetWindowLongPtrW(hwnd_, GWL_EXSTYLE,
+                      ex_style | static_cast<LONG_PTR>(WS_EX_NOACTIVATE));
+    InvalidateRect(hwnd_, nullptr, FALSE);
+  }
+  mode_ = Mode::progress;
+  pin_error_.clear();
+  pin_confirm_label_.clear();
+  pin_cancel_label_.clear();
+  pin_handler_ = nullptr;
 }
 
 void TransferProgressWindow::StartShowAnimation() {
@@ -717,6 +996,10 @@ void TransferProgressWindow::ReleaseResources() {
     DeleteObject(primary_button_hover_brush_);
     primary_button_hover_brush_ = nullptr;
   }
+  if (pin_field_brush_) {
+    DeleteObject(pin_field_brush_);
+    pin_field_brush_ = nullptr;
+  }
 }
 
 int TransferProgressWindow::Scale(int value) const {
@@ -724,7 +1007,15 @@ int TransferProgressWindow::Scale(int value) const {
 }
 
 int TransferProgressWindow::HeightForMode() const {
-  return mode_ == Mode::waiting ? kWaitingHeight : kProgressHeight;
+  switch (mode_) {
+    case Mode::waiting:
+      return kWaitingHeight;
+    case Mode::pin:
+      return kPinHeight;
+    case Mode::progress:
+      return kProgressHeight;
+  }
+  return kProgressHeight;
 }
 
 LRESULT CALLBACK TransferProgressWindow::WndProc(HWND window, UINT message,
@@ -749,7 +1040,17 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
                                                WPARAM wparam, LPARAM lparam) {
   switch (message) {
     case WM_MOUSEACTIVATE:
-      return MA_NOACTIVATE;
+      // A PIN prompt needs focus; everything else stays out of the way.
+      return mode_ == Mode::pin ? MA_ACTIVATE : MA_NOACTIVATE;
+    case WM_CTLCOLOREDIT: {
+      HDC dc = reinterpret_cast<HDC>(wparam);
+      if (pin_edit_ && reinterpret_cast<HWND>(lparam) == pin_edit_) {
+        SetTextColor(dc, foreground_color_);
+        SetBkColor(dc, dark_ ? RGB(45, 45, 45) : RGB(255, 255, 255));
+        return reinterpret_cast<LRESULT>(pin_field_brush_);
+      }
+      break;
+    }
     case WM_ERASEBKGND:
       return 1;
     case WM_TIMER:
@@ -853,7 +1154,11 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
       POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
       const int hit = HitTest(point);
       if (hit == 3) {
-        NotifyAction("hide");
+        if (mode_ == Mode::pin) {
+          CancelPin();
+        } else {
+          NotifyAction("hide");
+        }
         return 0;
       }
       if (hit == 1) {
@@ -880,7 +1185,7 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
 
       UpdateLayoutMetrics();
       POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
-      if (HitTest(point) == 0) {
+      if (HitTest(point) == 0 && mode_ != Mode::pin) {
         NotifyAction("open");
       }
       return 0;
