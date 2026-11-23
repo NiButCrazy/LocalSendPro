@@ -15,6 +15,12 @@ class DeviceListTile extends StatelessWidget {
 
   final String? info;
   final double? progress;
+
+  /// Optional status badge (e.g. "waiting for confirmation" / "sending").
+  final String? statusLabel;
+  final Color? statusBackgroundColor;
+  final Color? statusForegroundColor;
+
   final VoidCallback? onTap;
   final VoidCallback? onDetailsTap;
 
@@ -24,6 +30,9 @@ class DeviceListTile extends StatelessWidget {
     this.nameOverride,
     this.info,
     this.progress,
+    this.statusLabel,
+    this.statusBackgroundColor,
+    this.statusForegroundColor,
     this.onTap,
     this.onDetailsTap,
   });
@@ -53,6 +62,12 @@ class DeviceListTile extends StatelessWidget {
         runSpacing: 10,
         spacing: 10,
         children: [
+          if (statusLabel != null)
+            DeviceBadge(
+              backgroundColor: statusBackgroundColor ?? badgeColor,
+              foregroundColor: statusForegroundColor ?? Theme.of(context).colorScheme.onSecondaryContainer,
+              label: statusLabel!,
+            ),
           if (info != null)
             Text(info!, style: const TextStyle(color: Colors.grey))
           else if (progress != null)

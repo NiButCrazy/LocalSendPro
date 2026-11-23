@@ -243,6 +243,8 @@ class Translations$sendTab$en {
   /// en: 'Nearby devices'
   String get nearbyDevices => 'Nearby devices';
 
+  late final Translations$sendTab$deviceStatus$en deviceStatus = Translations$sendTab$deviceStatus$en.internal(_root);
+
   /// en: 'This Device'
   String get thisDevice => 'This Device';
 
@@ -1104,6 +1106,21 @@ class Translations$sendTab$picker$en {
 
   /// en: 'Paste'
   String get clipboard => 'Paste';
+}
+
+// Path: sendTab.deviceStatus
+class Translations$sendTab$deviceStatus$en {
+  Translations$sendTab$deviceStatus$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Waiting for confirmation'
+  String get waiting => 'Waiting for confirmation';
+
+  /// en: 'Sending'
+  String get sending => 'Sending';
 }
 
 // Path: sendTab.sendModes

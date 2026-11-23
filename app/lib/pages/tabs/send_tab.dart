@@ -220,12 +220,11 @@ class SendTab extends StatelessWidget {
                           nameOverride: favoriteEntry?.alias,
                           vm: vm,
                         )
-                      : DeviceListTile(
+                      : _SingleSendDeviceListTile(
                           device: device,
                           isFavorite: favoriteEntry != null,
                           nameOverride: favoriteEntry?.alias,
-                          onDetailsTap: () async => await context.push(() => DeviceDetailsPage(device: device)),
-                          onTap: () async => await vm.onTapDevice(context, device),
+                          vm: vm,
                         ),
                 ),
               );
@@ -529,7 +528,7 @@ class _MultiSendDeviceListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ref = context.ref;
-    final session = ref.watch(sendProvider).values.firstWhereOrNull((s) => s.target.ip == device.ip);
+    final session = ref.watch(sendProvider).values.firstWhereOrNull((s) => s.target.fingerprint == device.fingerprint);
     final String? info;
     final double? progress;
     if (session != null) {
@@ -548,15 +547,75 @@ class _MultiSendDeviceListTile extends StatelessWidget {
       progress = null;
       info = null;
     }
+    final badge = _statusBadge(context, session?.status);
     return DeviceListTile(
       device: device,
       info: info,
       progress: progress,
+      statusLabel: badge?.label,
+      statusBackgroundColor: badge?.background,
+      statusForegroundColor: badge?.foreground,
       isFavorite: isFavorite,
       nameOverride: nameOverride,
       onDetailsTap: () async => await context.push(() => DeviceDetailsPage(device: device)),
       onTap: () async => await vm.onTapDeviceMultiSend(context, device),
     );
+  }
+}
+
+/// 单选模式的设备磁贴：后台快速发送时也把会话状态标在设备上。
+class _SingleSendDeviceListTile extends StatelessWidget {
+  final Device device;
+  final bool isFavorite;
+  final String? nameOverride;
+  final SendTabVm vm;
+
+  const _SingleSendDeviceListTile({
+    required this.device,
+    required this.isFavorite,
+    required this.nameOverride,
+    required this.vm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.ref
+        .watch(sendProvider)
+        .values
+        .firstWhereOrNull(
+          (s) => s.target.fingerprint == device.fingerprint && (s.status == SessionStatus.waiting || s.status == SessionStatus.sending),
+        );
+    final badge = _statusBadge(context, session?.status);
+    return DeviceListTile(
+      device: device,
+      isFavorite: isFavorite,
+      nameOverride: nameOverride,
+      statusLabel: badge?.label,
+      statusBackgroundColor: badge?.background,
+      statusForegroundColor: badge?.foreground,
+      onDetailsTap: () async => await context.push(() => DeviceDetailsPage(device: device)),
+      onTap: () async => await vm.onTapDevice(context, device),
+    );
+  }
+}
+
+({String label, Color background, Color foreground})? _statusBadge(BuildContext context, SessionStatus? status) {
+  final colors = Theme.of(context).colorScheme;
+  switch (status) {
+    case SessionStatus.waiting:
+      return (
+        label: t.sendTab.deviceStatus.waiting,
+        background: colors.tertiaryContainer,
+        foreground: colors.onTertiaryContainer,
+      );
+    case SessionStatus.sending:
+      return (
+        label: t.sendTab.deviceStatus.sending,
+        background: colors.primaryContainer,
+        foreground: colors.onPrimaryContainer,
+      );
+    default:
+      return null;
   }
 }
 

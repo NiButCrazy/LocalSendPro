@@ -72,7 +72,11 @@
       "clipboard": "剪贴板"
     },
     "shareIntentInfo": "你也可以通过移动设备中的“分享”功能更简单地发送文件。",
-    "nearbyDevices": "附近的设备",
+    "nearbyDevices": "附近设备",
+    "deviceStatus": {
+      "waiting": "等待确认",
+      "sending": "发送中"
+    },
     "thisDevice": "这台设备",
     "scan": "扫描设备",
     "manualSending": "手动发送",

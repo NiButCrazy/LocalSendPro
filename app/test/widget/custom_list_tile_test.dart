@@ -17,15 +17,16 @@ const _device = Device(
   channels: [],
 );
 
-Widget _build({double? height}) {
+Widget _build({double? height, String? statusLabel}) {
   return MaterialApp(
     home: Scaffold(
       body: Center(
         child: SizedBox(
           width: 500,
           height: height,
-          child: const DeviceListTile(
+          child: DeviceListTile(
             device: _device,
+            statusLabel: statusLabel,
             onDetailsTap: _noop,
           ),
         ),
@@ -48,5 +49,13 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(tester.getSize(find.byType(DeviceListTile)).height, naturalHeight - 2);
+  });
+
+  testWidgets('DeviceListTile renders a status badge', (tester) async {
+    await tester.pumpWidget(_build(statusLabel: '等待确认'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('等待确认'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

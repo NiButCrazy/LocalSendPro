@@ -221,7 +221,9 @@ class Translations$sendTab$zh_CN extends Translations$sendTab$en {
   @override
   String get shareIntentInfo => '你也可以通过移动设备中的“分享”功能更简单地发送文件。';
   @override
-  String get nearbyDevices => '附近的设备';
+  String get nearbyDevices => '附近设备';
+  @override
+  late final Translations$sendTab$deviceStatus$zh_CN deviceStatus = Translations$sendTab$deviceStatus$zh_CN.internal(_root);
   @override
   String get thisDevice => '这台设备';
   @override
@@ -963,6 +965,19 @@ class Translations$sendTab$picker$zh_CN extends Translations$sendTab$picker$en {
   String get app => '应用';
   @override
   String get clipboard => '剪贴板';
+}
+
+// Path: sendTab.deviceStatus
+class Translations$sendTab$deviceStatus$zh_CN extends Translations$sendTab$deviceStatus$en {
+  Translations$sendTab$deviceStatus$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get waiting => '等待确认';
+  @override
+  String get sending => '发送中';
 }
 
 // Path: sendTab.sendModes

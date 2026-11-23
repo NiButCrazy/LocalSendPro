@@ -73,6 +73,10 @@
     },
     "shareIntentInfo": "You can also use the \"Share\" feature of your mobile device to select files more easily.",
     "nearbyDevices": "Nearby devices",
+    "deviceStatus": {
+      "waiting": "Waiting for confirmation",
+      "sending": "Sending"
+    },
     "thisDevice": "This Device",
     "scan": "Search devices",
     "manualSending": "Manual sending",
