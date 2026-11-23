@@ -566,6 +566,12 @@ class Translations$contextMenuPage$en {
   /// en: 'List nearby devices in the submenu. Clicking a device sends immediately.'
   String get quickSendDescription => 'List nearby devices in the submenu. Clicking a device sends immediately.';
 
+  /// en: 'Show context menu icon'
+  String get showIcon => 'Show context menu icon';
+
+  /// en: 'Show the app icon next to the LocalSend menu entry.'
+  String get showIconDescription => 'Show the app icon next to the LocalSend menu entry.';
+
   /// en: 'Looking for device…'
   String get searching => 'Looking for device…';
 

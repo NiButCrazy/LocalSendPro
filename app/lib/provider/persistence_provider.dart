@@ -110,6 +110,7 @@ const _verifyChecksums = 'ls_verify_checksums';
 const _advancedSettingsKey = 'ls_advanced_settings';
 const _whatsNewKey = 'ls_whats_new';
 const _contextMenuQuickSend = 'ls_context_menu_quick_send';
+const _contextMenuIcon = 'ls_context_menu_icon';
 
 final persistenceProvider = Provider<PersistenceService>((ref) {
   throw Exception('persistenceProvider not initialized');
@@ -605,6 +606,15 @@ class PersistenceService {
 
   Future<void> setContextMenuQuickSend(bool value) async {
     await _prefs.setBool(_contextMenuQuickSend, value);
+  }
+
+  /// Whether the LocalSend entry shows the application icon.
+  bool isContextMenuIcon() {
+    return _prefs.getBool(_contextMenuIcon) ?? true;
+  }
+
+  Future<void> setContextMenuIcon(bool value) async {
+    await _prefs.setBool(_contextMenuIcon, value);
   }
 
   QuickSaveMode getQuickSave() {

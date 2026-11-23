@@ -42,8 +42,9 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
 
   Future<void> _setShowInContextMenu(bool value) async {
     final quickSend = ref.read(settingsProvider).contextMenuQuickSend;
+    final showIcon = ref.read(settingsProvider).contextMenuIcon;
     setState(() => _busy = true);
-    final success = value ? await enableContextMenu(quickSend: quickSend) : await disableContextMenu();
+    final success = value ? await enableContextMenu(quickSend: quickSend, showIcon: showIcon) : await disableContextMenu();
     if (!mounted) {
       return;
     }
@@ -61,8 +62,9 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
   }
 
   Future<void> _setQuickSend(bool value) async {
+    final showIcon = ref.read(settingsProvider).contextMenuIcon;
     setState(() => _busy = true);
-    final success = await enableContextMenu(quickSend: value);
+    final success = await enableContextMenu(quickSend: value, showIcon: showIcon);
     if (!mounted) {
       return;
     }
@@ -79,10 +81,34 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
     }
   }
 
+  Future<void> _setContextMenuIcon(bool value) async {
+    final enabled = _showInContextMenu ?? false;
+    if (!enabled) {
+      await ref.notifier(settingsProvider).setContextMenuIcon(value);
+      return;
+    }
+    final quickSend = ref.read(settingsProvider).contextMenuQuickSend;
+    setState(() => _busy = true);
+    final success = await enableContextMenu(quickSend: quickSend, showIcon: value);
+    if (!mounted) {
+      return;
+    }
+    if (!success) {
+      setState(() => _busy = false);
+      context.showSnackBar(t.general.error);
+      return;
+    }
+    await ref.notifier(settingsProvider).setContextMenuIcon(value);
+    if (mounted) {
+      setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
     final quickSend = context.watch(settingsProvider.select((settings) => settings.contextMenuQuickSend));
+    final showIcon = context.watch(settingsProvider.select((settings) => settings.contextMenuIcon));
     final enabled = _showInContextMenu;
     return Scaffold(
       appBar: AppBar(
@@ -104,6 +130,12 @@ class _ContextMenuPageState extends State<ContextMenuPage> with Refena {
                   subtitle: Text(t.contextMenuPage.quickSendDescription),
                   value: enabled && quickSend,
                   onChanged: !enabled || _busy ? null : _setQuickSend,
+                ),
+                SwitchListTile.adaptive(
+                  title: Text(t.contextMenuPage.showIcon),
+                  subtitle: Text(t.contextMenuPage.showIconDescription),
+                  value: showIcon,
+                  onChanged: _busy ? null : _setContextMenuIcon,
                 ),
               ],
             ),

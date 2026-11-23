@@ -94,10 +94,11 @@ Future<RefenaContainer> preInit(List<String> args) async {
 
   if (!persistenceService.isPortableMode()) {
     final quickSend = persistenceService.isContextMenuQuickSend();
+    final contextMenuIcon = persistenceService.isContextMenuIcon();
     if (persistenceService.isFirstAppStart) {
-      await enableContextMenu(quickSend: quickSend);
+      await enableContextMenu(quickSend: quickSend, showIcon: contextMenuIcon);
     } else {
-      await migrateContextMenu(quickSend: quickSend);
+      await migrateContextMenu(quickSend: quickSend, showIcon: contextMenuIcon);
     }
   }
 

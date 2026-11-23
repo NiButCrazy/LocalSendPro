@@ -48,7 +48,7 @@ class DeviceMenuEntry {
 ///
 /// [quickSend] 为 true 时父键变成级联菜单，设备列表由 [updateContextMenuDevices] 填充；
 /// 为 false 时保持经典的单一动词。
-Future<bool> enableContextMenu({required bool quickSend}) async {
+Future<bool> enableContextMenu({required bool quickSend, bool showIcon = true}) async {
   if (defaultTargetPlatform != TargetPlatform.windows) {
     return false;
   }
@@ -56,8 +56,8 @@ Future<bool> enableContextMenu({required bool quickSend}) async {
   try {
     // 只有父键在“普通动词”和“级联菜单”之间切换（或首次写入）时才需要通知外壳。
     // 每次启动都刷新会让桌面图标/关联闪一下。
-    final structureChanged = !_menuStructureMatches(quickSend: quickSend);
-    final menuWritten = _writeContextMenu(quickSend: quickSend);
+    final structureChanged = !_menuStructureMatches(quickSend: quickSend, showIcon: showIcon);
+    final menuWritten = _writeContextMenu(quickSend: quickSend, showIcon: showIcon);
     try {
       await _createSendToShortcut();
     } catch (e, stackTrace) {
@@ -115,16 +115,16 @@ Future<bool> isContextMenuEnabled() async {
 
 /// Adds the menu for installs that only had the SendTo shortcut before, and
 /// keeps the command pointing at the current executable after an update.
-Future<void> migrateContextMenu({required bool quickSend}) async {
+Future<void> migrateContextMenu({required bool quickSend, bool showIcon = true}) async {
   if (defaultTargetPlatform != TargetPlatform.windows) {
     return;
   }
   if (await isContextMenuEnabled()) {
-    await enableContextMenu(quickSend: quickSend);
+    await enableContextMenu(quickSend: quickSend, showIcon: showIcon);
     return;
   }
   if (await File(_getWindowsFilePath(_windowsFileName)).exists()) {
-    await enableContextMenu(quickSend: quickSend);
+    await enableContextMenu(quickSend: quickSend, showIcon: showIcon);
   }
 }
 
@@ -223,7 +223,7 @@ String buildScanCommand({required String executable, required String pathToken})
   return '"$executable" --hidden --scan "$pathToken"';
 }
 
-bool _writeContextMenu({required bool quickSend}) {
+bool _writeContextMenu({required bool quickSend, required bool showIcon}) {
   final executable = Platform.resolvedExecutable;
   final title = _menuTitle();
   final icon = '"$executable",0';
@@ -242,6 +242,7 @@ bool _writeContextMenu({required bool quickSend}) {
         icon: icon,
         executable: executable,
         quickSend: quickSend,
+        showIcon: showIcon,
         background: path[1] == 'Background',
       );
     }
@@ -272,7 +273,7 @@ void _ensureDeviceRoots(RegistryKey classes) {
 /// 三个父键是否已经是目标形态（普通动词或级联菜单）。
 ///
 /// 形态没变时不需要 `SHChangeNotify`，否则每次启动/切换都会让桌面刷新。
-bool _menuStructureMatches({required bool quickSend}) {
+bool _menuStructureMatches({required bool quickSend, required bool showIcon}) {
   for (final path in _verbPaths) {
     final RegistryKey verb;
     try {
@@ -288,7 +289,11 @@ bool _menuStructureMatches({required bool quickSend}) {
     try {
       final extended = verb.getStringValue('ExtendedSubCommandsKey');
       final hasCommand = _keyExists('Software\\Classes\\${[...path, 'command'].join('\\')}');
+      final hasIcon = verb.getStringValue('Icon') != null;
       if (quickSend ? (extended == null || hasCommand) : (extended != null || !hasCommand)) {
+        return false;
+      }
+      if (hasIcon != showIcon) {
         return false;
       }
     } finally {
@@ -318,6 +323,7 @@ void _writeVerb(
   required String icon,
   required String executable,
   required bool quickSend,
+  required bool showIcon,
   bool background = false,
 }) {
   // 整键重建：两种模式使用的值不同，残留的默认值或 command 子键会让 Windows 用错模式。
@@ -335,12 +341,16 @@ void _writeVerb(
     if (quickSend) {
       // 级联菜单：父键不能有默认值，否则 Windows 仍按普通动词处理。
       verb.createValue(RegistryValue.string('MUIVerb', title));
-      verb.createValue(RegistryValue.string('Icon', icon));
+      if (showIcon) {
+        verb.createValue(RegistryValue.string('Icon', icon));
+      }
       verb.createValue(RegistryValue.string('MultiSelectModel', 'Player'));
       verb.createValue(RegistryValue.string('ExtendedSubCommandsKey', background ? _backgroundDevicesKey : _devicesKey));
     } else {
       verb.createValue(RegistryValue.string('', title));
-      verb.createValue(RegistryValue.string('Icon', icon));
+      if (showIcon) {
+        verb.createValue(RegistryValue.string('Icon', icon));
+      }
       verb.createValue(RegistryValue.string('MultiSelectModel', 'Player'));
     }
   } finally {

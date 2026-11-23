@@ -493,6 +493,10 @@ class Translations$contextMenuPage$zh_CN extends Translations$contextMenuPage$en
   @override
   String get quickSendDescription => '在二级菜单中列出附近设备，点击设备后直接发送。';
   @override
+  String get showIcon => '在右键菜单中显示图标';
+  @override
+  String get showIconDescription => '在 LocalSend 菜单项旁显示应用图标。';
+  @override
   String get searching => '正在查找设备…';
   @override
   String get scanning => '正在查找附近设备…';

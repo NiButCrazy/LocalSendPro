@@ -301,6 +301,8 @@
     "enableDescription": "在文件、文件夹和文件夹空白处的右键菜单中显示 LocalSend。",
     "quickSend": "右键菜单快速发送",
     "quickSendDescription": "在二级菜单中列出附近设备，点击设备后直接发送。",
+    "showIcon": "在右键菜单中显示图标",
+    "showIconDescription": "在 LocalSend 菜单项旁显示应用图标。",
     "searching": "正在查找设备…",
     "scanning": "正在查找附近设备…",
     "deviceUnavailable": "未找到设备，请手动选择设备发送。",

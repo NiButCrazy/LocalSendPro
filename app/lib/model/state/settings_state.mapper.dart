@@ -216,6 +216,11 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     'contextMenuQuickSend',
     _$contextMenuQuickSend,
   );
+  static bool _$contextMenuIcon(SettingsState v) => v.contextMenuIcon;
+  static const Field<SettingsState, bool> _f$contextMenuIcon = Field(
+    'contextMenuIcon',
+    _$contextMenuIcon,
+  );
 
   @override
   final MappableFields<SettingsState> fields = const {
@@ -258,6 +263,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
     #discoveryTimeout: _f$discoveryTimeout,
     #advancedSettings: _f$advancedSettings,
     #contextMenuQuickSend: _f$contextMenuQuickSend,
+    #contextMenuIcon: _f$contextMenuIcon,
   };
 
   static SettingsState _instantiate(DecodingData data) {
@@ -301,6 +307,7 @@ class SettingsStateMapper extends ClassMapperBase<SettingsState> {
       discoveryTimeout: data.dec(_f$discoveryTimeout),
       advancedSettings: data.dec(_f$advancedSettings),
       contextMenuQuickSend: data.dec(_f$contextMenuQuickSend),
+      contextMenuIcon: data.dec(_f$contextMenuIcon),
     );
   }
 
@@ -410,6 +417,7 @@ abstract class SettingsStateCopyWith<$R, $In extends SettingsState, $Out>
     int? discoveryTimeout,
     bool? advancedSettings,
     bool? contextMenuQuickSend,
+    bool? contextMenuIcon,
   });
   SettingsStateCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -481,6 +489,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
     int? discoveryTimeout,
     bool? advancedSettings,
     bool? contextMenuQuickSend,
+    bool? contextMenuIcon,
   }) => $apply(
     FieldCopyWithData({
       if (showToken != null) #showToken: showToken,
@@ -530,6 +539,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       if (advancedSettings != null) #advancedSettings: advancedSettings,
       if (contextMenuQuickSend != null)
         #contextMenuQuickSend: contextMenuQuickSend,
+      if (contextMenuIcon != null) #contextMenuIcon: contextMenuIcon,
     }),
   );
   @override
@@ -597,6 +607,7 @@ class _SettingsStateCopyWithImpl<$R, $Out>
       #contextMenuQuickSend,
       or: $value.contextMenuQuickSend,
     ),
+    contextMenuIcon: data.get(#contextMenuIcon, or: $value.contextMenuIcon),
   );
 
   @override
