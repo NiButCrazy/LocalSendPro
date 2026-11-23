@@ -8,11 +8,10 @@ import 'package:localsend_app/config/theme.dart';
 import 'package:localsend_app/gen/strings.g.dart';
 import 'package:localsend_app/model/persistence/color_mode.dart';
 import 'package:localsend_app/pages/home_page.dart';
-import 'package:localsend_app/pages/home_page_controller.dart';
 import 'package:localsend_app/provider/animation_provider.dart';
 import 'package:localsend_app/provider/local_ip_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
-import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_app/provider/quick_send_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/util/native/autostart_helper.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
@@ -65,20 +64,15 @@ Future<void> main(List<String> args) async {
     // The Windows runner forwards a second launch (double-clicking the exe or picking LocalSend in
     // the Share menu) before starting another engine, so this is the fast path for showing the app.
     handleSecondInstance = (secondArgs) {
-      // A start-at-login hand-over must not pull a running instance to the foreground.
-      if (!secondArgs.contains(startHiddenFlag)) {
+      // 右键菜单快速发送不抢前台；隐藏启动的交接同样不拉起主窗口。
+      final quickSend = secondArgs.contains('--send-to');
+      if (!secondArgs.contains(startHiddenFlag) && !quickSend) {
         unawaited(showFromTray());
       }
       if (secondArgs.isEmpty) {
         return;
       }
-      unawaited(
-        container.redux(selectedSendingFilesProvider).dispatchAsyncTakeResult(LoadSelectionFromArgsAction(secondArgs)).then((filesAdded) {
-          if (filesAdded) {
-            container.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
-          }
-        }),
-      );
+      unawaited(container.global.dispatchAsync(HandleSendArgumentsAction(args: secondArgs)));
     };
 
     final pending = pendingSecondInstanceArgs;

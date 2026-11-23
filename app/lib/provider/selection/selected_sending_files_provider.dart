@@ -295,7 +295,17 @@ class LoadSelectionFromArgsAction extends AsyncReduxActionWithResult<SelectedSen
     bool filesAdded = false;
     bool nextShare = false;
     bool nextText = false;
+    bool nextSendTo = false;
     for (final arg in args) {
+      if (arg == '--send-to') {
+        nextSendTo = true;
+        continue;
+      }
+      if (nextSendTo) {
+        // 后一项是设备指纹，不是文件路径。
+        nextSendTo = false;
+        continue;
+      }
       if (arg == '--share') {
         nextShare = true;
         continue;

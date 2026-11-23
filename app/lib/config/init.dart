@@ -21,6 +21,7 @@ import 'package:localsend_app/provider/persistence_provider.dart';
 // [FOSS_REMOVE_START]
 import 'package:localsend_app/provider/purchase_provider.dart';
 // [FOSS_REMOVE_END]
+import 'package:localsend_app/provider/quick_send_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/tv_provider.dart';
@@ -91,10 +92,11 @@ Future<RefenaContainer> preInit(List<String> args) async {
   );
 
   if (!persistenceService.isPortableMode()) {
+    final quickSend = persistenceService.isContextMenuQuickSend();
     if (persistenceService.isFirstAppStart) {
-      await enableContextMenu();
+      await enableContextMenu(quickSend: quickSend);
     } else {
-      await migrateContextMenu();
+      await migrateContextMenu(quickSend: quickSend);
     }
   }
 
@@ -262,7 +264,7 @@ Future<void> postInit(BuildContext context, Ref ref, bool appStart) async {
       // handle dropped files
       pendingFilesStream.listen((files) async {
         await ref.global.dispatchAsync(
-          _HandleAppStartArgumentsAction(
+          HandleSendArgumentsAction(
             args: files,
           ),
         );
@@ -280,7 +282,7 @@ Future<void> postInit(BuildContext context, Ref ref, bool appStart) async {
     } else {
       final args = ref.read(appArgumentsProvider);
       await ref.global.dispatchAsync(
-        _HandleAppStartArgumentsAction(
+        HandleSendArgumentsAction(
           args: args,
         ),
       );
@@ -370,21 +372,5 @@ class _HandleShareIntentAction extends AsyncGlobalAction {
         );
 
     ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
-  }
-}
-
-class _HandleAppStartArgumentsAction extends AsyncGlobalAction {
-  final List<String> args;
-
-  _HandleAppStartArgumentsAction({
-    required this.args,
-  });
-
-  @override
-  Future<void> reduce() async {
-    final filesAdded = await ref.redux(selectedSendingFilesProvider).dispatchAsyncTakeResult(LoadSelectionFromArgsAction(args));
-    if (filesAdded) {
-      ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
-    }
   }
 }

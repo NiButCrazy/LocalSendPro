@@ -8,7 +8,6 @@ import 'package:localsend_app/model/persistence/transfer_history_entry.dart';
 import 'package:localsend_app/model/state/server/receive_session_state.dart';
 import 'package:localsend_app/model/state/server/receiving_file.dart';
 import 'package:localsend_app/pages/home_page.dart';
-import 'package:localsend_app/pages/home_page_controller.dart';
 import 'package:localsend_app/pages/progress_page.dart';
 import 'package:localsend_app/pages/receive_page.dart';
 import 'package:localsend_app/provider/device_info_provider.dart';
@@ -19,11 +18,12 @@ import 'package:localsend_app/provider/logging/discovery_logs_provider.dart';
 import 'package:localsend_app/provider/network/send_provider.dart';
 import 'package:localsend_app/provider/network/server/server_provider.dart';
 import 'package:localsend_app/provider/network/server/server_utils.dart';
+import 'package:localsend_app/provider/quick_send_provider.dart';
 import 'package:localsend_app/provider/security_provider.dart';
 import 'package:localsend_app/provider/selection/selected_receiving_files_provider.dart';
-import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/transfer_history_provider.dart';
+import 'package:localsend_app/util/native/autostart_helper.dart';
 import 'package:localsend_app/util/native/directories.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
@@ -549,23 +549,23 @@ class ReceiveController {
       return;
     }
 
-    // ignore: discarded_futures
-    showFromTray().catchError((e) {
-      // don't wait for it
-      _logger.severe('Failed to show from tray', e);
-    });
-
     final args = event.args;
+    // 右键菜单快速发送和隐藏启动都不应把主窗口拉到前台。
+    final quickSend = args.contains('--send-to');
+    if (!args.contains(startHiddenFlag) && !quickSend) {
+      // ignore: discarded_futures
+      showFromTray().catchError((e) {
+        // don't wait for it
+        _logger.severe('Failed to show from tray', e);
+      });
+    }
+
     if (args.isEmpty) {
       return;
     }
 
     // ignore: unawaited_futures, discarded_futures
-    server.ref.redux(selectedSendingFilesProvider).dispatchAsyncTakeResult(LoadSelectionFromArgsAction(args)).then((filesAdded) {
-      if (filesAdded) {
-        server.ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
-      }
-    });
+    server.ref.global.dispatchAsync(HandleSendArgumentsAction(args: args));
   }
 
   /// Handles an action from the Windows transfer request window.
