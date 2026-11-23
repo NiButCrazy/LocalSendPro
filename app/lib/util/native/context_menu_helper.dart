@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:localsend_app/util/native/shell_change_notify.dart';
+import 'package:localsend_isolates/model/device.dart';
 import 'package:logging/logging.dart';
 import 'package:win32_registry/win32_registry.dart';
 
@@ -9,18 +11,49 @@ final _logger = Logger('ContextMenuHelper');
 /// A GUID keeps the verb key unique and lets old installs be cleaned up reliably.
 const _verbKey = '{6D3F2C8A-5B4E-4F1A-9C7D-2E8B1A0F4C63}';
 
-Future<bool> enableContextMenu() async {
+/// 级联菜单的数据根键，`ExtendedSubCommandsKey` 相对 `HKCU\Software\Classes` 解析。
+const _devicesKey = 'LocalSend.ContextMenuDevices';
+const _backgroundDevicesKey = 'LocalSend.ContextMenuDevicesBackground';
+
+/// 一次最多写入的设备数量，避免菜单过长。
+const _maxDeviceEntries = 20;
+
+/// `ECF_DISABLED`：让无设备时的占位项不可点击。
+const _ecfDisabled = 0x2;
+
+/// 右键菜单里的一个设备条目。
+@immutable
+class DeviceMenuEntry {
+  final String fingerprint;
+
+  /// 已转义（`&` → `&&`）并去掉换行的显示名；空别名回退为指纹。
+  final String displayAlias;
+  final bool favorite;
+
+  const DeviceMenuEntry({
+    required this.fingerprint,
+    required this.displayAlias,
+    required this.favorite,
+  });
+}
+
+/// 写入（或刷新）右键菜单。
+///
+/// [quickSend] 为 true 时父键变成级联菜单，设备列表由 [updateContextMenuDevices] 填充；
+/// 为 false 时保持经典的单一动词。
+Future<bool> enableContextMenu({required bool quickSend}) async {
   if (defaultTargetPlatform != TargetPlatform.windows) {
     return false;
   }
 
   try {
-    final menuWritten = _writeContextMenu();
+    final menuWritten = _writeContextMenu(quickSend: quickSend);
     try {
       await _createSendToShortcut();
     } catch (e, stackTrace) {
       _logger.warning('Could not create the SendTo shortcut', e, stackTrace);
     }
+    notifyShellAssociationsChanged();
     return menuWritten;
   } catch (e, stackTrace) {
     _logger.severe('Failed to enable context menu', e, stackTrace);
@@ -38,7 +71,9 @@ Future<bool> disableContextMenu() async {
     if (await shortcut.exists()) {
       await shortcut.delete();
     }
-    return _deleteContextMenu();
+    final deleted = _deleteContextMenu();
+    notifyShellAssociationsChanged();
+    return deleted;
   } catch (e, stackTrace) {
     _logger.warning('Failed to disable context menu', e, stackTrace);
     return false;
@@ -65,20 +100,109 @@ Future<bool> isContextMenuEnabled() async {
 
 /// Adds the menu for installs that only had the SendTo shortcut before, and
 /// keeps the command pointing at the current executable after an update.
-Future<void> migrateContextMenu() async {
+Future<void> migrateContextMenu({required bool quickSend}) async {
   if (defaultTargetPlatform != TargetPlatform.windows) {
     return;
   }
   if (await isContextMenuEnabled()) {
-    await enableContextMenu();
+    await enableContextMenu(quickSend: quickSend);
     return;
   }
   if (await File(_getWindowsFilePath(_windowsFileName)).exists()) {
-    await enableContextMenu();
+    await enableContextMenu(quickSend: quickSend);
   }
 }
 
-bool _writeContextMenu() {
+/// 重写设备子菜单。
+///
+/// [quickSend] 为 false 时递归删除两个设备根键。
+Future<void> updateContextMenuDevices({
+  required bool quickSend,
+  required Iterable<Device> devices,
+  required Set<String> favoriteFingerprints,
+}) async {
+  if (defaultTargetPlatform != TargetPlatform.windows) {
+    return;
+  }
+
+  final entries = quickSend ? buildDeviceMenuEntries(devices: devices, favoriteFingerprints: favoriteFingerprints) : const <DeviceMenuEntry>[];
+  try {
+    final classes = Registry.openPath(
+      RegistryHive.currentUser,
+      path: r'Software\Classes',
+      desiredAccessRights: AccessRights.allAccess,
+    );
+    try {
+      _writeDeviceEntries(classes, quickSend: quickSend, entries: entries);
+    } finally {
+      classes.close();
+    }
+    notifyShellAssociationsChanged();
+  } catch (e, stackTrace) {
+    _logger.warning('Failed to update the context menu devices', e, stackTrace);
+  }
+}
+
+/// 过滤出可接收上传的设备，收藏优先，按别名排序并截断到 [_maxDeviceEntries]。
+///
+/// 也用于同步定时器计算签名，所以不是测试专用。
+List<DeviceMenuEntry> buildDeviceMenuEntries({
+  required Iterable<Device> devices,
+  required Set<String> favoriteFingerprints,
+}) {
+  final seen = <String>{};
+  final candidates = <({Device device, bool favorite})>[];
+  for (final device in devices) {
+    if (device.ip == null || device.download) {
+      continue;
+    }
+    if (!seen.add(device.fingerprint)) {
+      continue;
+    }
+    candidates.add((device: device, favorite: favoriteFingerprints.contains(device.fingerprint)));
+  }
+
+  candidates.sort((a, b) {
+    if (a.favorite != b.favorite) {
+      return a.favorite ? -1 : 1;
+    }
+    final byAlias = a.device.alias.toLowerCase().compareTo(b.device.alias.toLowerCase());
+    if (byAlias != 0) {
+      return byAlias;
+    }
+    return a.device.fingerprint.compareTo(b.device.fingerprint);
+  });
+
+  return candidates
+      .take(_maxDeviceEntries)
+      .map((candidate) {
+        final label = escapeMenuLabel(candidate.device.alias);
+        return DeviceMenuEntry(
+          fingerprint: candidate.device.fingerprint,
+          displayAlias: label.isEmpty ? candidate.device.fingerprint : label,
+          favorite: candidate.favorite,
+        );
+      })
+      .toList(growable: false);
+}
+
+/// 把别名转成静态菜单可用的标签：`&` 需要转义，换行会破坏单项显示。
+@visibleForTesting
+String escapeMenuLabel(String alias) {
+  return alias.replaceAll('&', '&&').replaceAll(RegExp(r'[\r\n\t]+'), ' ').trim();
+}
+
+/// 菜单命令：隐藏启动并直接把文件发给指定指纹。
+@visibleForTesting
+String buildDeviceCommand({
+  required String executable,
+  required String fingerprint,
+  required String pathToken,
+}) {
+  return '"$executable" --hidden --send-to "$fingerprint" "$pathToken"';
+}
+
+bool _writeContextMenu({required bool quickSend}) {
   final executable = Platform.resolvedExecutable;
   final title = _menuTitle();
   final icon = '"$executable",0';
@@ -89,9 +213,19 @@ bool _writeContextMenu() {
   );
 
   try {
-    _writeVerb(classes, ['*', 'shell', _verbKey], title, icon, '"$executable" "%1"');
-    _writeVerb(classes, ['Directory', 'shell', _verbKey], title, icon, '"$executable" "%1"');
-    _writeVerb(classes, ['Directory', 'Background', 'shell', _verbKey], title, icon, '"$executable" "%V"');
+    _writeVerb(classes, ['*', 'shell', _verbKey], title: title, icon: icon, executable: executable, quickSend: quickSend);
+    _writeVerb(classes, ['Directory', 'shell', _verbKey], title: title, icon: icon, executable: executable, quickSend: quickSend);
+    _writeVerb(
+      classes,
+      ['Directory', 'Background', 'shell', _verbKey],
+      title: title,
+      icon: icon,
+      executable: executable,
+      quickSend: quickSend,
+      background: true,
+    );
+    // 让级联菜单在尚无设备时也有内容，避免出现空子菜单。
+    _writeDeviceEntries(classes, quickSend: quickSend, entries: const []);
     return true;
   } finally {
     classes.close();
@@ -100,25 +234,118 @@ bool _writeContextMenu() {
 
 void _writeVerb(
   RegistryKey classes,
-  List<String> path,
-  String title,
-  String icon,
-  String command,
-) {
+  List<String> path, {
+  required String title,
+  required String icon,
+  required String executable,
+  required bool quickSend,
+  bool background = false,
+}) {
+  // 整键重建：两种模式使用的值不同，残留的默认值或 command 子键会让 Windows 用错模式。
+  final shell = _createKeyPath(classes, path.sublist(0, path.length - 1));
+  try {
+    shell.deleteKey(path.last, recursive: true);
+  } catch (_) {
+    // 动词可能尚不存在。
+  } finally {
+    shell.close();
+  }
+
   final verb = _createKeyPath(classes, path);
   try {
-    verb.createValue(RegistryValue.string('', title));
-    verb.createValue(RegistryValue.string('Icon', icon));
-    verb.createValue(RegistryValue.string('MultiSelectModel', 'Player'));
+    if (quickSend) {
+      // 级联菜单：父键不能有默认值，否则 Windows 仍按普通动词处理。
+      verb.createValue(RegistryValue.string('MUIVerb', title));
+      verb.createValue(RegistryValue.string('Icon', icon));
+      verb.createValue(RegistryValue.string('MultiSelectModel', 'Player'));
+      verb.createValue(RegistryValue.string('ExtendedSubCommandsKey', background ? _backgroundDevicesKey : _devicesKey));
+    } else {
+      verb.createValue(RegistryValue.string('', title));
+      verb.createValue(RegistryValue.string('Icon', icon));
+      verb.createValue(RegistryValue.string('MultiSelectModel', 'Player'));
+    }
   } finally {
     verb.close();
   }
 
-  final commandKey = _createKeyPath(classes, [...path, 'command']);
+  if (!quickSend) {
+    final commandKey = _createKeyPath(classes, [...path, 'command']);
+    try {
+      commandKey.createValue(RegistryValue.string('', '"$executable" "${background ? '%V' : '%1'}"'));
+    } finally {
+      commandKey.close();
+    }
+  }
+}
+
+void _writeDeviceEntries(
+  RegistryKey classes, {
+  required bool quickSend,
+  required List<DeviceMenuEntry> entries,
+}) {
+  if (!quickSend) {
+    _deleteKeySilently(classes, _devicesKey);
+    _deleteKeySilently(classes, _backgroundDevicesKey);
+    return;
+  }
+
+  final executable = Platform.resolvedExecutable;
+  _rewriteDeviceRoot(classes, rootKey: _devicesKey, entries: entries, executable: executable, pathToken: '%1');
+  _rewriteDeviceRoot(classes, rootKey: _backgroundDevicesKey, entries: entries, executable: executable, pathToken: '%V');
+}
+
+void _rewriteDeviceRoot(
+  RegistryKey classes, {
+  required String rootKey,
+  required List<DeviceMenuEntry> entries,
+  required String executable,
+  required String pathToken,
+}) {
+  final root = _createKeyPath(classes, [rootKey]);
   try {
-    commandKey.createValue(RegistryValue.string('', command));
+    root.deleteKey('shell', recursive: true);
+  } catch (_) {
+    // 子键可能尚不存在。
   } finally {
-    commandKey.close();
+    root.close();
+  }
+
+  final shell = _createKeyPath(classes, [rootKey, 'shell']);
+  try {
+    if (entries.isEmpty) {
+      final placeholder = shell.createKey('none');
+      try {
+        placeholder.createValue(RegistryValue.string('MUIVerb', _noDevicesLabel()));
+        placeholder.createValue(RegistryValue.int32('CommandFlags', _ecfDisabled));
+      } finally {
+        placeholder.close();
+      }
+      return;
+    }
+
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      final keyName = 'd$i';
+      final verb = shell.createKey(keyName);
+      try {
+        verb.createValue(RegistryValue.string('MUIVerb', entry.displayAlias));
+        verb.createValue(RegistryValue.string('MultiSelectModel', 'Player'));
+        verb.createValue(RegistryValue.int32('CommandFlags', 0));
+      } finally {
+        verb.close();
+      }
+
+      final command = _createKeyPath(classes, [rootKey, 'shell', keyName, 'command']);
+      try {
+        command.createValue(
+          RegistryValue.string('', buildDeviceCommand(executable: executable, fingerprint: entry.fingerprint, pathToken: pathToken)),
+        );
+      } finally {
+        command.close();
+      }
+    }
+  } finally {
+    shell.close();
   }
 }
 
@@ -133,6 +360,8 @@ bool _deleteContextMenu() {
     _deleteVerb(classes, ['*', 'shell', _verbKey]);
     _deleteVerb(classes, ['Directory', 'shell', _verbKey]);
     _deleteVerb(classes, ['Directory', 'Background', 'shell', _verbKey]);
+    _deleteKeySilently(classes, _devicesKey);
+    _deleteKeySilently(classes, _backgroundDevicesKey);
     return true;
   } finally {
     classes.close();
@@ -147,6 +376,14 @@ void _deleteVerb(RegistryKey classes, List<String> path) {
     // The verb may not exist.
   } finally {
     shell.close();
+  }
+}
+
+void _deleteKeySilently(RegistryKey classes, String key) {
+  try {
+    classes.deleteKey(key, recursive: true);
+  } catch (_) {
+    // 键可能不存在。
   }
 }
 
@@ -165,6 +402,11 @@ RegistryKey _createKeyPath(RegistryKey root, List<String> segments) {
 String _menuTitle() {
   final locale = Platform.localeName.toLowerCase();
   return locale.startsWith('zh') ? '使用 LocalSend 发送' : 'Send with LocalSend';
+}
+
+String _noDevicesLabel() {
+  final locale = Platform.localeName.toLowerCase();
+  return locale.startsWith('zh') ? '没有可发送的设备' : 'No devices available';
 }
 
 Future<void> _createSendToShortcut() async {

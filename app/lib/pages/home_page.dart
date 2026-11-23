@@ -11,8 +11,11 @@ import 'package:localsend_app/pages/tabs/receive_tab.dart';
 import 'package:localsend_app/pages/tabs/send_tab.dart';
 import 'package:localsend_app/pages/tabs/settings_tab.dart';
 import 'package:localsend_app/pages/tabs/transfer_history_tab.dart';
+import 'package:localsend_app/provider/favorites_provider.dart';
+import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
+import 'package:localsend_app/util/native/context_menu_helper.dart';
 import 'package:localsend_app/util/native/cross_file_converters.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/widget/responsive_builder.dart';
@@ -64,6 +67,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with Refena, WindowListener {
   bool _dragAndDropIndicator = false;
 
+  /// 右键菜单设备子菜单的同步定时器（仅 Windows）。
+  Timer? _contextMenuTimer;
+
+  /// 上一次写入子菜单时的内容签名，避免每 2 秒重写注册表。
+  String? _contextMenuSignature;
+
   @override
   void initState() {
     super.initState();
@@ -76,15 +85,54 @@ class _HomePageState extends State<HomePage> with Refena, WindowListener {
     ensureRef((ref) async {
       ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(widget.initialTab));
       await postInit(context, ref, widget.appStart);
+      if (!mounted) {
+        return;
+      }
+      if (checkPlatform([TargetPlatform.windows])) {
+        _contextMenuTimer = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(_syncContextMenuDevices()));
+        await _syncContextMenuDevices();
+      }
     });
   }
 
   @override
   void dispose() {
+    _contextMenuTimer?.cancel();
     if (checkPlatform([TargetPlatform.windows])) {
       windowManager.removeListener(this);
     }
     super.dispose();
+  }
+
+  /// 把当前发现列表同步到右键菜单的设备子菜单。
+  Future<void> _syncContextMenuDevices() async {
+    if (!mounted) {
+      return;
+    }
+
+    final quickSend = ref.read(settingsProvider).contextMenuQuickSend;
+    if (!quickSend) {
+      if (_contextMenuSignature == 'off') {
+        return;
+      }
+      _contextMenuSignature = 'off';
+      await updateContextMenuDevices(quickSend: false, devices: const [], favoriteFingerprints: const {});
+      return;
+    }
+
+    final devices = ref.read(nearbyDevicesProvider).allDevices.values.toList(growable: false);
+    final favorites = ref.read(favoritesProvider).map((favorite) => favorite.fingerprint).toSet();
+    final signature = [
+      'on',
+      for (final entry in buildDeviceMenuEntries(devices: devices, favoriteFingerprints: favorites))
+        '${entry.fingerprint}|${entry.displayAlias}|${entry.favorite}',
+    ].join('\n');
+    if (signature == _contextMenuSignature) {
+      return;
+    }
+
+    _contextMenuSignature = signature;
+    await updateContextMenuDevices(quickSend: true, devices: devices, favoriteFingerprints: favorites);
   }
 
   /// Keeps the native transfer window hidden while the app window is usable.

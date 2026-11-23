@@ -20,7 +20,7 @@ Future<void> _runMigrations(int from) async {
 Future<void> _migrate2() async {
   _logger.info('Migrating to version 2');
   if (SharedPreferencesStorePlatform.instance is! SharedPreferencesPortable) {
-    await enableContextMenu();
+    await enableContextMenu(quickSend: false);
 
     if (defaultTargetPlatform == TargetPlatform.windows) {
       final newFolder = File(_windowsFile).parent;

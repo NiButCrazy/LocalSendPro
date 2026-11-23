@@ -136,6 +136,8 @@ Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Get-Ap
 Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\*\shell\{{6D3F2C8A-5B4E-4F1A-9C7D-2E8B1A0F4C63}"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuFiles"
 Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\Directory\shell\{{6D3F2C8A-5B4E-4F1A-9C7D-2E8B1A0F4C63}"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuFolders"
 Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\Directory\Background\shell\{{6D3F2C8A-5B4E-4F1A-9C7D-2E8B1A0F4C63}"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuBackground"
+Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\LocalSend.ContextMenuDevices"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuDevices"
+Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\LocalSend.ContextMenuDevicesBackground"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuDevicesBackground"
 
 [UninstallDelete]
 Type: files; Name: "{userappdata}\Microsoft\Windows\SendTo\LocalSend.lnk"
