@@ -90,8 +90,12 @@ Future<RefenaContainer> preInit(List<String> args) async {
     supportsDynamicColors: dynamicColors != null,
   );
 
-  if (persistenceService.isFirstAppStart && !persistenceService.isPortableMode()) {
-    await enableContextMenu();
+  if (!persistenceService.isPortableMode()) {
+    if (persistenceService.isFirstAppStart) {
+      await enableContextMenu();
+    } else {
+      await migrateContextMenu();
+    }
   }
 
   await initI18n();

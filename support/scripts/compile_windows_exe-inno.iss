@@ -131,6 +131,12 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -Command Get-AppxPackage -Na
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Get-AppxPackage LocalSend.App | Remove-AppxPackage"; Flags: nowait runhidden
 #endif
 #endif
+Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\*\shell\{{6D3F2C8A-5B4E-4F1A-9C7D-2E8B1A0F4C63}"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuFiles"
+Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\Directory\shell\{{6D3F2C8A-5B4E-4F1A-9C7D-2E8B1A0F4C63}"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuFolders"
+Filename: "reg.exe"; Parameters: "delete ""HKCU\Software\Classes\Directory\Background\shell\{{6D3F2C8A-5B4E-4F1A-9C7D-2E8B1A0F4C63}"" /f"; Flags: runhidden; RunOnceId: "RemoveContextMenuBackground"
+
+[UninstallDelete]
+Type: files; Name: "{userappdata}\Microsoft\Windows\SendTo\LocalSend.lnk"
 
 [Code]
 #ifdef LooseRegister
