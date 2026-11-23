@@ -142,3 +142,11 @@ Slang, source files in `app/assets/i18n/` (`<locale>.json` plus `_missing_transl
 ## Release notes
 
 `app/pubspec.yaml`'s version must match `#define MyAppVersion` in `support/scripts/compile_windows_exe-inno.iss` and the `version` in `cli/Cargo.toml` (the CLI prints it in its start banner) — CI fails on a mismatch. Platform build commands and release steps are documented in `README.md` ("Building") and `CONTRIBUTING.md` ("Release").
+
+## Dev mode and hot reload (Windows)
+
+When the app runs in dev mode, drive hot reload through the Dart Tooling Daemon instead of typing into the `flutter run` console:
+
+1. `flutter run -d windows` starts a Dart Tooling Daemon together with the app. Read its URI with `fvm dart tooling-daemon --list` (match the PID / workspace root to the instance you started).
+2. Over the dart MCP server: `connect_dart_tooling_daemon` with that `ws://...` URI, then `hot_reload`, then `get_runtime_errors` to check for exceptions.
+3. Only Dart/UI changes hot reload. Rust/FFI, native C++, bundled assets or a `pubspec` change require a restart.
