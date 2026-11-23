@@ -17,6 +17,7 @@ import 'package:localsend_app/util/alias_generator.dart';
 import 'package:localsend_app/util/native/autostart_helper.dart';
 import 'package:localsend_app/util/native/context_menu_helper.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
+import 'package:localsend_app/util/persistence/history_storage.dart';
 import 'package:localsend_app/util/security_helper.dart';
 import 'package:localsend_app/util/shared_preferences/shared_preferences_file.dart';
 import 'package:localsend_app/util/shared_preferences/shared_preferences_portable.dart';
@@ -25,6 +26,7 @@ import 'package:localsend_isolates/constants.dart';
 import 'package:localsend_isolates/model/device.dart';
 import 'package:localsend_isolates/model/stored_security_context.dart';
 import 'package:logging/logging.dart';
+import 'package:path/path.dart' as p;
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
@@ -55,8 +57,9 @@ const _signalingServers = 'ls_signaling_servers';
 const _stunServers = 'ls_stun_servers';
 
 // Transfer history
-// 键名保持不变，旧版本的接收记录会自动成为「全部时间」层的数据。
-const _receiveHistory = 'ls_receive_history';
+// Older versions stored the history inside settings.json under this key.
+// It is only read once for the migration to history.json.
+const _legacyReceiveHistory = 'ls_receive_history';
 const _historyLimit = 'ls_history_limit'; // 0 = unlimited
 const _historyDefaultFilter = 'ls_history_default_filter';
 const _historyDefaultLayer = 'ls_history_default_layer';
@@ -115,11 +118,14 @@ final persistenceProvider = Provider<PersistenceService>((ref) {
 class PersistenceService {
   final SharedPreferences _prefs;
   final bool isFirstAppStart;
+  final HistoryStorage? _historyStorage;
+  final List<TransferHistoryEntry> _history;
 
-  PersistenceService._(this._prefs, this.isFirstAppStart);
+  PersistenceService._(this._prefs, this.isFirstAppStart, this._historyStorage, this._history);
 
   static Future<PersistenceService> initialize({
     required bool supportsDynamicColors,
+    @visibleForTesting File? historyFile,
   }) async {
     SharedPreferences prefs;
 
@@ -216,7 +222,92 @@ class PersistenceService {
       await prefs.remove(launchMinimizedLegacyKey);
     }
 
-    return PersistenceService._(prefs, isFirstAppStart);
+    final resolvedHistoryStorage = _resolveHistoryStorage(historyFile);
+    var history = <TransferHistoryEntry>[];
+    if (resolvedHistoryStorage != null) {
+      history = resolvedHistoryStorage.load();
+
+      final legacyHistory = prefs.getStringList(_legacyReceiveHistory);
+      if (legacyHistory != null) {
+        var canRemoveLegacy = true;
+        if (history.isEmpty && legacyHistory.isNotEmpty) {
+          history = _decodeHistory(legacyHistory);
+          try {
+            await resolvedHistoryStorage.save(history);
+          } catch (e, stackTrace) {
+            _logger.severe('Could not migrate the transfer history to ${resolvedHistoryStorage.file.path}', e, stackTrace);
+            canRemoveLegacy = false;
+          }
+        }
+        if (canRemoveLegacy) {
+          await prefs.remove(_legacyReceiveHistory);
+        }
+      }
+    } else {
+      // Platforms without a dedicated file keep the legacy storage.
+      history = _decodeHistory(prefs.getStringList(_legacyReceiveHistory) ?? const []);
+    }
+
+    return PersistenceService._(prefs, isFirstAppStart, resolvedHistoryStorage, history);
+  }
+
+  /// Resolves the history file next to the settings or in the user data dir.
+  ///
+  /// Windows: `%APPDATA%\LocalSend\history.json`
+  /// Portable: `<exe directory>\history.json`
+  static HistoryStorage? _resolveHistoryStorage(File? override) {
+    if (override != null) {
+      return HistoryStorage(override);
+    }
+
+    final store = SharedPreferencesStorePlatform.instance;
+    if (store is SharedPreferencesPortable) {
+      return HistoryStorage(File(p.join(File(store.getPath()).parent.path, 'history.json')));
+    }
+
+    if (checkPlatform([TargetPlatform.windows])) {
+      final appData = Platform.environment['APPDATA'];
+      if (appData == null || appData.isEmpty) {
+        return null;
+      }
+      return HistoryStorage(File(p.join(appData, 'LocalSend', 'history.json')));
+    }
+
+    if (checkPlatform([TargetPlatform.linux])) {
+      final xdgDataHome = Platform.environment['XDG_DATA_HOME'];
+      final home = Platform.environment['HOME'];
+      final base = xdgDataHome != null && xdgDataHome.isNotEmpty
+          ? xdgDataHome
+          : home != null && home.isNotEmpty
+          ? p.join(home, '.local', 'share')
+          : null;
+      if (base == null) {
+        return null;
+      }
+      return HistoryStorage(File(p.join(base, 'localsend', 'history.json')));
+    }
+
+    if (checkPlatform([TargetPlatform.macOS])) {
+      final home = Platform.environment['HOME'];
+      if (home == null || home.isEmpty) {
+        return null;
+      }
+      return HistoryStorage(File(p.join(home, 'Library', 'Application Support', 'LocalSend', 'history.json')));
+    }
+
+    return null;
+  }
+
+  static List<TransferHistoryEntry> _decodeHistory(List<String> rawEntries) {
+    final entries = <TransferHistoryEntry>[];
+    for (final rawEntry in rawEntries) {
+      try {
+        entries.add(TransferHistoryEntry.fromJson(jsonDecode(rawEntry)));
+      } catch (e, stackTrace) {
+        _logger.warning('Skipping an unreadable transfer history entry', e, stackTrace);
+      }
+    }
+    return entries;
   }
 
   static Future<void> _initColorSetting(SharedPreferences prefs, bool supportsDynamicColors) async {
@@ -266,13 +357,27 @@ class PersistenceService {
   }
 
   List<TransferHistoryEntry> getTransferHistory() {
-    final historyRaw = _prefs.getStringList(_receiveHistory) ?? [];
-    return historyRaw.map((entry) => TransferHistoryEntry.fromJson(jsonDecode(entry))).toList();
+    return List.unmodifiable(_history);
   }
 
   Future<void> setTransferHistory(List<TransferHistoryEntry> entries) async {
+    _history
+      ..clear()
+      ..addAll(entries);
+
+    final storage = _historyStorage;
+    if (storage != null) {
+      try {
+        await storage.save(entries);
+      } catch (e, stackTrace) {
+        _logger.severe('Could not write the transfer history to ${storage.file.path}', e, stackTrace);
+      }
+      return;
+    }
+
+    // Legacy platforms keep the history inside SharedPreferences.
     final historyRaw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
-    await _prefs.setStringList(_receiveHistory, historyRaw);
+    await _prefs.setStringList(_legacyReceiveHistory, historyRaw);
   }
 
   /// The number of entries kept in the persistent history. `0` means unlimited.
