@@ -55,11 +55,7 @@ class TransferNotification {
     _mainWindowActive = active;
 
     if (_mainWindowActive) {
-      if (_hasForcedItem) {
-        _showProgressWindow();
-      } else {
-        TransferProgressWindow.hideProgressOnly();
-      }
+      TransferProgressWindow.hideProgressOnly();
     } else {
       _showProgressWindow();
     }
@@ -68,16 +64,9 @@ class TransferNotification {
   /// Whether the main app window is visible and not minimized.
   static bool get isMainWindowActive => _mainWindowActive;
 
-  static bool get _hasForcedItem =>
-      _transfers.values.any((transfer) => transfer.forceWindow) || _pending.values.any((pending) => pending.forceWindow);
-
-  /// Shows the current aggregate state in the native window, unless the main window is visible
-  /// and nothing forced the window.
+  /// Shows the current aggregate state in the native window, unless the main window is visible.
   static void _showProgressWindow() {
-    if (_transfers.isEmpty && _pending.isEmpty) {
-      return;
-    }
-    if (_mainWindowActive && !_hasForcedItem) {
+    if (_mainWindowActive || (_transfers.isEmpty && _pending.isEmpty)) {
       return;
     }
     final snapshot = _snapshot();
@@ -86,7 +75,7 @@ class TransferNotification {
 
   /// Forwards progress to the native window, unless the main window is visible.
   static void _updateProgressWindow(({String title, String windowTitle, String text, String windowText, int percentage}) snapshot) {
-    if (_mainWindowActive && !_hasForcedItem) {
+    if (_mainWindowActive) {
       return;
     }
     TransferProgressWindow.update(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
@@ -127,17 +116,14 @@ class TransferNotification {
   ///
   /// Must be called while the app is in the foreground: Android 12+ rejects starting a foreground
   /// service from the background.
-  ///
-  /// [forceWindow] keeps the native Windows window visible even while the main window is usable,
-  /// which is what a send started from the context menu needs.
-  static void start({required String sessionId, required bool receiving, bool forceWindow = false}) {
+  static void start({required String sessionId, required bool receiving}) {
     _pending.remove(sessionId);
     if (_transfers.containsKey(sessionId)) {
       return;
     }
 
     final isFirst = _transfers.isEmpty;
-    _transfers[sessionId] = _Transfer(receiving: receiving, forceWindow: forceWindow);
+    _transfers[sessionId] = _Transfer(receiving: receiving);
 
     if (isFirst) {
       _cancelCompletionTimer();
@@ -156,19 +142,14 @@ class TransferNotification {
   ///
   /// A pending session is independent from [_transfers], so it never triggers the
   /// "session already registered" early return of [start].
-  static void startPending({
-    required String sessionId,
-    required String title,
-    required String text,
-    bool forceWindow = true,
-  }) {
+  static void startPending({required String sessionId, required String title, required String text}) {
     if (!TransferProgressWindow.isSupported) {
       return;
     }
 
-    _pending[sessionId] = _PendingTransfer(title: title, text: text, forceWindow: forceWindow);
+    _pending[sessionId] = _PendingTransfer(title: title, text: text);
     _cancelCompletionTimer();
-    if (!_mainWindowActive || forceWindow) {
+    if (!_mainWindowActive) {
       TransferProgressWindow.show(title: title, text: text, percentage: 0);
     }
   }
@@ -176,12 +157,10 @@ class TransferNotification {
   /// Re-shows the waiting state of a pending session, e.g. after a PIN prompt was answered.
   static void restorePending(String sessionId) {
     final pending = _pending[sessionId];
-    if (pending == null) {
+    if (pending == null || _mainWindowActive) {
       return;
     }
-    if (!_mainWindowActive || pending.forceWindow) {
-      TransferProgressWindow.show(title: pending.title, text: pending.text, percentage: 0);
-    }
+    TransferProgressWindow.show(title: pending.title, text: pending.text, percentage: 0);
   }
 
   /// Hides progress and waiting states without canceling a PIN prompt.
@@ -241,7 +220,7 @@ class TransferNotification {
         if (outcome == null) {
           TransferProgressWindow.hide();
         } else {
-          _showPendingOutcome(pending, outcome, text: text);
+          _showPendingOutcome(outcome, text: text);
         }
       }
       return;
@@ -266,10 +245,10 @@ class TransferNotification {
 
   /// Shows why a request ended before the transfer existed, then hides after the
   /// completion display duration.
-  static void _showPendingOutcome(_PendingTransfer pending, TransferOutcome outcome, {String? text}) {
+  static void _showPendingOutcome(TransferOutcome outcome, {String? text}) {
     _cancelCompletionTimer();
 
-    if (_mainWindowActive && !pending.forceWindow) {
+    if (_mainWindowActive) {
       TransferProgressWindow.hideProgressOnly();
       return;
     }
@@ -306,7 +285,7 @@ class TransferNotification {
     _cancelCompletionTimer();
 
     // Keep the native window out of the way while the user can see the app itself.
-    if (_mainWindowActive && !transfer.forceWindow) {
+    if (_mainWindowActive) {
       TransferProgressWindow.hideProgressOnly();
       return;
     }
@@ -333,7 +312,7 @@ class TransferNotification {
         TransferProgressWindow.hide();
         return;
       }
-      if (_mainWindowActive && !transfer.forceWindow) {
+      if (_mainWindowActive) {
         return;
       }
       TransferProgressWindow.update(
@@ -475,21 +454,19 @@ class TransferNotification {
 
 class _Transfer {
   final bool receiving;
-  final bool forceWindow;
   int currentBytes = 0;
   int totalBytes = 0;
   int finishedFiles = 0;
   int totalFiles = 0;
   int? speedInBytes;
 
-  _Transfer({required this.receiving, required this.forceWindow});
+  _Transfer({required this.receiving});
 }
 
 /// 已显示等待窗口、但尚未开始传输的会话。
 class _PendingTransfer {
   final String title;
   final String text;
-  final bool forceWindow;
 
-  const _PendingTransfer({required this.title, required this.text, required this.forceWindow});
+  const _PendingTransfer({required this.title, required this.text});
 }

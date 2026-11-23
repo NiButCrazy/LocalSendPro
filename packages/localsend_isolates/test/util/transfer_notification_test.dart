@@ -202,9 +202,8 @@ void main() {
     expect(arguments['progress'], 0.5);
   });
 
-  test('shows the waiting state while the main window is visible if forced', () async {
+  test('shows the waiting state only once the main window is hidden', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    // setUp already hid the app window; make it visible again to prove the forcing.
     TransferNotification.setMainWindowActive(true);
 
     TransferNotification.startPending(
@@ -212,6 +211,10 @@ void main() {
       title: 'My PC',
       text: 'Looking for device…',
     );
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, isEmpty);
+
+    TransferNotification.setMainWindowActive(false);
     await Future<void>.delayed(Duration.zero);
 
     expect(calls, hasLength(1));
@@ -230,7 +233,6 @@ void main() {
       sessionId: 'search:a',
       title: 'My PC',
       text: 'Looking for device…',
-      forceWindow: false,
     );
     await Future<void>.delayed(Duration.zero);
 
@@ -239,10 +241,9 @@ void main() {
 
   test('start replaces the pending state', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    TransferNotification.setMainWindowActive(true);
 
     TransferNotification.startPending(sessionId: 'a', title: 'My PC', text: 'Looking for device…');
-    TransferNotification.start(sessionId: 'a', receiving: false, forceWindow: true);
+    TransferNotification.start(sessionId: 'a', receiving: false);
     TransferNotification.stop('a');
     await Future<void>.delayed(Duration.zero);
 

@@ -17,9 +17,8 @@ class PinPrompt {
     required String title,
     required String text,
     required bool invalid,
-    required bool forceNative,
   }) async {
-    if (TransferProgressWindow.isSupported && (forceNative || !TransferNotification.isMainWindowActive)) {
+    if (TransferProgressWindow.isSupported && !TransferNotification.isMainWindowActive) {
       return TransferProgressWindow.showPin(
         title: title,
         text: text,

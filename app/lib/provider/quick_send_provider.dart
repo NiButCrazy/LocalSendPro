@@ -88,7 +88,6 @@ class QuickSendCoordinator {
       sessionId: _searchSessionId(fingerprint),
       title: t.progressPage.titleSending,
       text: t.contextMenuPage.searching,
-      forceWindow: true,
     );
 
     _timers.remove(fingerprint)?.cancel();
@@ -107,6 +106,8 @@ class QuickSendCoordinator {
       _fallBackToSendPage();
       return;
     }
+
+    _logger.info('Quick send to $fingerprint: ${files.length} file(s)');
 
     var target = _findDevice(fingerprint);
     if (target == null) {

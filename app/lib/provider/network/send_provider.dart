@@ -162,12 +162,11 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
         );
 
     if (notifyWhileWaiting) {
-      // 主窗口保持隐藏，先显示原生等待窗口。
+      // 主窗口隐藏时显示原生等待窗口；主窗口可见时不弹通知。
       TransferNotification.startPending(
         sessionId: sessionId,
         title: target.alias,
         text: t.sendPage.waiting,
-        forceWindow: true,
       );
     }
 
@@ -306,7 +305,6 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                 title: t.dialogs.pin.title,
                 text: '${target.alias}\n${t.sendPage.pinRequired}',
                 invalid: !pinFirstAttempt,
-                forceNative: notifyWhileWaiting,
               );
 
               pinFirstAttempt = false;
@@ -522,7 +520,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
 
     // Keep the process alive for the whole transfer. Started here, while the app is still in the
     // foreground, because Android 12+ rejects starting a foreground service from the background.
-    TransferNotification.start(sessionId: sessionId, receiving: false, forceWindow: notifyWhileWaiting);
+    TransferNotification.start(sessionId: sessionId, receiving: false);
 
     await _sendLoop(sessionId, sendingFiles);
   }
@@ -536,6 +534,9 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
   }) {
     if (!enabled) {
       return;
+    }
+    if (text != null) {
+      _logger.info('Waiting request $sessionId ended before transfer: $outcome ($text)');
     }
     TransferNotification.stop(sessionId, outcome: outcome, text: text);
   }
