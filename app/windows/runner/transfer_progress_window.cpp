@@ -20,7 +20,7 @@ constexpr int kPinHeight = 220;
 constexpr UINT_PTR kAnimationTimerId = 1;
 constexpr int kAnimationIntervalMs = 15;
 constexpr int kAnimationDurationMs = 180;
-constexpr int kAnimationSlide = 10;  // logical pixels
+constexpr int kAnimationSlide = 10;  // logical pixels, visual offset only
 constexpr BYTE kWindowAlpha = 255;   // fully opaque
 
 // Smooths the progress bar between updates from the Dart side (every ~100 ms).
@@ -447,9 +447,11 @@ void TransferProgressWindow::PositionBottomRight() {
   const int margin = Scale(12);
   // Leave some room above the work area so an auto-hiding taskbar cannot cover the card.
   const int bottom_offset = Scale(48);
-  const int x = monitor_info.rcWork.right - width - margin;
-  const int y = monitor_info.rcWork.bottom - height - margin - bottom_offset;
-  SetWindowPos(hwnd_, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE);
+  anchor_right_ = monitor_info.rcWork.right - margin;
+  anchor_bottom_ = monitor_info.rcWork.bottom - margin - bottom_offset;
+  anchor_valid_ = true;
+  SetWindowPos(hwnd_, HWND_TOPMOST, anchor_right_ - width,
+               anchor_bottom_ - height, width, height, SWP_NOACTIVATE);
 }
 
 void TransferProgressWindow::ResizeForMode() {
@@ -457,19 +459,27 @@ void TransferProgressWindow::ResizeForMode() {
     return;
   }
 
-  RECT current = {};
-  GetWindowRect(hwnd_, &current);
   const int width = Scale(360);
   const int height = Scale(HeightForMode());
 
-  if (current.right > current.left && current.bottom > current.top) {
-    // Keep the bottom-right corner fixed when the mode changes the height.
-    SetWindowPos(hwnd_, nullptr, current.right - width,
-                 current.bottom - height, width, height,
+  if (!user_positioned_ && anchor_valid_) {
+    // Keep the anchored bottom-right corner fixed instead of reading the current
+    // rect, which would accumulate rounding drift while the height changes.
+    SetWindowPos(hwnd_, nullptr, anchor_right_ - width,
+                 anchor_bottom_ - height, width, height,
                  SWP_NOZORDER | SWP_NOACTIVATE);
   } else {
-    SetWindowPos(hwnd_, nullptr, 0, 0, width, height,
-                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    RECT current = {};
+    GetWindowRect(hwnd_, &current);
+    if (current.right > current.left && current.bottom > current.top) {
+      // Keep the bottom-right corner fixed when the mode changes the height.
+      SetWindowPos(hwnd_, nullptr, current.right - width,
+                   current.bottom - height, width, height,
+                   SWP_NOZORDER | SWP_NOACTIVATE);
+    } else {
+      SetWindowPos(hwnd_, nullptr, 0, 0, width, height,
+                   SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
   }
   UpdateLayoutMetrics();
 }
@@ -910,12 +920,20 @@ void TransferProgressWindow::StartShowAnimation() {
     hiding_ = false;
   }
 
+  // The slide is a visual offset around the resting position. Deriving the base
+  // from the anchor (instead of the current rect) keeps positioning independent
+  // from the animation, so repeated show/hide cycles cannot drift.
   RECT rect = {};
   GetWindowRect(hwnd_, &rect);
-  animation_base_x_ = rect.left;
-  animation_base_y_ = rect.top;
-  const int width = rect.right - rect.left;
-  const int height = rect.bottom - rect.top;
+  const int width = rect.right > rect.left ? rect.right - rect.left : Scale(360);
+  const int height = rect.bottom > rect.top ? rect.bottom - rect.top : Scale(HeightForMode());
+  if (!user_positioned_ && anchor_valid_) {
+    animation_base_x_ = anchor_right_ - width;
+    animation_base_y_ = anchor_bottom_ - height;
+  } else {
+    animation_base_x_ = rect.left;
+    animation_base_y_ = rect.top;
+  }
 
   SetLayeredWindowAttributes(hwnd_, 0, 0, LWA_ALPHA);
   SetWindowPos(hwnd_, HWND_TOPMOST, animation_base_x_,
@@ -942,8 +960,19 @@ void TransferProgressWindow::StartHideAnimation() {
 
   RECT rect = {};
   GetWindowRect(hwnd_, &rect);
-  animation_base_x_ = rect.left;
-  animation_base_y_ = rect.top;
+  const int width = rect.right > rect.left ? rect.right - rect.left : Scale(360);
+  const int height = rect.bottom > rect.top ? rect.bottom - rect.top : Scale(HeightForMode());
+  if (!user_positioned_ && anchor_valid_) {
+    animation_base_x_ = anchor_right_ - width;
+    animation_base_y_ = anchor_bottom_ - height;
+  } else {
+    animation_base_x_ = rect.left;
+    animation_base_y_ = rect.top;
+  }
+  // Start the fade from the resting position even if the last cycle left the
+  // hidden window below its anchor.
+  SetWindowPos(hwnd_, nullptr, animation_base_x_, animation_base_y_, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 
   animation_step_ = 0;
   animating_ = true;

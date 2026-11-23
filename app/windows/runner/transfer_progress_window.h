@@ -99,8 +99,13 @@ class TransferProgressWindow {
   bool animating_ = false;
   bool hiding_ = false;
   int animation_step_ = 0;
+  // Animation-only offset base, always derived from the anchor (or the dragged rect).
   int animation_base_x_ = 0;
   int animation_base_y_ = 0;
+  // Fixed bottom-right anchor (outer window coordinates) while the card is not dragged.
+  int anchor_right_ = 0;
+  int anchor_bottom_ = 0;
+  bool anchor_valid_ = false;
   COLORREF background_color_ = RGB(245, 245, 245);
   COLORREF foreground_color_ = RGB(31, 31, 31);
   COLORREF accent_color_ = RGB(0, 120, 212);
