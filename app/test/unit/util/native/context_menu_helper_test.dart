@@ -77,6 +77,10 @@ void main() {
       r'"C:\app.exe" --hidden --send-to "FP" "%1"',
     );
   });
+
+  test('buildScanCommand 使用隐藏启动、扫描与路径', () {
+    expect(buildScanCommand(executable: r'C:\app.exe', pathToken: '%1'), r'"C:\app.exe" --hidden --scan "%1"');
+  });
 }
 
 Device _device({

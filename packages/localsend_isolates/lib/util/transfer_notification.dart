@@ -70,7 +70,12 @@ class TransferNotification {
       return;
     }
     final snapshot = _snapshot();
-    TransferProgressWindow.show(title: snapshot.windowTitle, text: snapshot.windowText, percentage: snapshot.percentage);
+    TransferProgressWindow.show(
+      title: snapshot.windowTitle,
+      text: snapshot.windowText,
+      percentage: snapshot.percentage,
+      indeterminate: _transfers.isEmpty,
+    );
   }
 
   /// Forwards progress to the native window, unless the main window is visible.
@@ -150,8 +155,76 @@ class TransferNotification {
     _pending[sessionId] = _PendingTransfer(title: title, text: text);
     _cancelCompletionTimer();
     if (!_mainWindowActive) {
-      TransferProgressWindow.show(title: title, text: text, percentage: 0);
+      TransferProgressWindow.show(title: title, text: text, percentage: 0, indeterminate: true);
     }
+  }
+
+  /// Removes a pending session without touching the native window.
+  ///
+  /// Used when another UI (e.g. the device picker) takes the window over and the
+  /// upcoming transfer should replace it without a hide/show cycle.
+  static void clearPending(String sessionId) {
+    _pending.remove(sessionId);
+  }
+
+  /// Shows a short, bar-less notice (e.g. "no nearby devices") for the
+  /// configured display duration. Used by the context-menu scan when staying on
+  /// the notification instead of opening the main window.
+  static void showNotice({required String title, required String text}) {
+    if (!TransferProgressWindow.isSupported) {
+      return;
+    }
+
+    _cancelCompletionTimer();
+    // A notice replaces whatever pending wait was on screen.
+    _pending.clear();
+    var remainingSeconds = _completionDisplayDuration.inSeconds;
+    if (remainingSeconds <= 0) {
+      TransferProgressWindow.hide();
+      return;
+    }
+
+    TransferProgressWindow.show(
+      title: title,
+      text: _noticeText(text, remainingSeconds),
+      percentage: 0,
+      showBar: false,
+    );
+
+    _completionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      remainingSeconds--;
+      if (remainingSeconds <= 0) {
+        timer.cancel();
+        _completionTimer = null;
+        TransferProgressWindow.hide();
+        return;
+      }
+      TransferProgressWindow.update(
+        title: title,
+        text: _noticeText(text, remainingSeconds),
+        percentage: 0,
+        showBar: false,
+      );
+    });
+  }
+
+  static String _noticeText(String text, int remainingSeconds) {
+    final countdown = _requiredStrings.completionCountdown(seconds: remainingSeconds);
+    return text.isEmpty ? countdown : '$text\n$countdown';
+  }
+
+  /// Forgets pending waits without touching running transfers.
+  ///
+  /// Called when the user closes the native card, so a dismissed "searching"
+  /// state cannot reappear on the next window-state change.
+  static void dismissPending() {
+    _pending.clear();
+    _cancelCompletionTimer();
+  }
+
+  /// Clears only the picker/scan states, keeping other fingerprints' searches.
+  static void clearScanPending() {
+    _pending.removeWhere((sessionId, _) => sessionId.startsWith('scan:'));
   }
 
   /// Re-shows the waiting state of a pending session, e.g. after a PIN prompt was answered.
@@ -160,7 +233,7 @@ class TransferNotification {
     if (pending == null || _mainWindowActive) {
       return;
     }
-    TransferProgressWindow.show(title: pending.title, text: pending.text, percentage: 0);
+    TransferProgressWindow.show(title: pending.title, text: pending.text, percentage: 0, indeterminate: true);
   }
 
   /// Hides progress and waiting states without canceling a PIN prompt.
@@ -228,6 +301,10 @@ class TransferNotification {
 
     if (_transfers.isEmpty) {
       ForegroundService.stop();
+      if (outcome != null) {
+        // A finished transfer must not resurrect a leftover "looking for device" card.
+        _pending.clear();
+      }
       if (_pending.isNotEmpty) {
         _showProgressWindow();
       } else if (outcome != null) {
@@ -265,6 +342,7 @@ class TransferNotification {
       title: title,
       text: _pendingOutcomeText(text, remainingSeconds),
       percentage: 0,
+      showBar: false,
     );
 
     _completionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -282,6 +360,7 @@ class TransferNotification {
         title: title,
         text: _pendingOutcomeText(text, remainingSeconds),
         percentage: 0,
+        showBar: false,
       );
     });
   }
@@ -320,10 +399,14 @@ class TransferNotification {
 
     final title = _outcomeTitle(transfer, outcome);
     final percentage = _outcomePercentage(transfer, outcome);
+    // Keep the bar itself at 100% for a completed transfer; only the text
+    // changes to the result/countdown.
+    final showBar = outcome == TransferOutcome.completed;
     TransferProgressWindow.show(
       title: title,
       text: _outcomeText(transfer, outcome, remainingSeconds: remainingSeconds),
       percentage: percentage,
+      showBar: showBar,
     );
 
     _completionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -341,6 +424,7 @@ class TransferNotification {
         title: title,
         text: _outcomeText(transfer, outcome, remainingSeconds: remainingSeconds),
         percentage: percentage,
+        showBar: showBar,
       );
     });
   }

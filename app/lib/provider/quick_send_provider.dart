@@ -6,15 +6,19 @@ import 'package:localsend_app/model/cross_file.dart';
 import 'package:localsend_app/model/state/send/send_session_state.dart';
 import 'package:localsend_app/pages/home_page.dart';
 import 'package:localsend_app/pages/home_page_controller.dart';
+import 'package:localsend_app/provider/favorites_provider.dart';
 import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
+import 'package:localsend_app/provider/network/scan_facade.dart';
 import 'package:localsend_app/provider/network/send_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_app/util/device_presence.dart';
 import 'package:localsend_app/util/native/platform_check.dart';
 import 'package:localsend_app/util/native/tray_helper.dart';
 import 'package:localsend_app/util/ui/snackbar.dart';
 import 'package:localsend_isolates/model/device.dart';
 import 'package:localsend_isolates/model/session_status.dart';
 import 'package:localsend_isolates/util/transfer_notification.dart';
+import 'package:localsend_isolates/util/transfer_progress_window.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
@@ -48,7 +52,9 @@ class QuickSendCoordinator {
 
   /// 设备不在发现列表时最多等待多久。
   static const _deviceTimeout = Duration(seconds: 10);
-  static const _pollInterval = Duration(milliseconds: 200);
+
+  /// 占位项扫描阶段的等待通知 id。
+  static const _scanSessionId = 'scan:picker';
 
   final Map<String, Timer> _timers = {};
 
@@ -86,9 +92,10 @@ class QuickSendCoordinator {
       return;
     }
 
+    // 先进入“查找设备”阶段；扫描确认设备在线后才切到“等待响应”。
     TransferNotification.startPending(
       sessionId: _searchSessionId(fingerprint),
-      title: t.progressPage.titleSending,
+      title: t.sendTab.nearbyDevices,
       text: t.contextMenuPage.searching,
     );
 
@@ -96,43 +103,60 @@ class QuickSendCoordinator {
     _timers[fingerprint] = Timer(_debounce, () => unawaited(_sendBatch(fingerprint)));
   }
 
-  Future<void> _sendBatch(String fingerprint) async {
+  Future<void> _sendBatch(String fingerprint, {List<CrossFile>? filesOverride}) async {
     _timers.remove(fingerprint);
     // 读取文件后立刻结束这一批，下一次点击会重新清空旧选择。
     _batches.remove(fingerprint);
 
-    final files = List<CrossFile>.of(_ref.read(selectedSendingFilesProvider));
+    // 扫描选择器打开期间可能有新的 --scan 批次清空全局选择，因此这里使用
+    // 进入选择器前捕获的文件列表。
+    final files = filesOverride ?? List<CrossFile>.of(_ref.read(selectedSendingFilesProvider));
+    _logger.info('Quick send batch for $fingerprint: ${files.length} file(s)');
     final sessionId = _searchSessionId(fingerprint);
     if (files.isEmpty) {
+      TransferProgressWindow.hide();
       TransferNotification.stop(sessionId);
-      _fallBackToSendPage();
       return;
     }
 
     _logger.info('Quick send to $fingerprint: ${files.length} file(s)');
 
-    var target = _findDevice(fingerprint);
-    if (target == null) {
-      _ref.redux(nearbyDevicesProvider).dispatch(StartMulticastScan());
-      final deadline = DateTime.now().add(_deviceTimeout);
-      while (target == null && DateTime.now().isBefore(deadline)) {
-        await Future<void>.delayed(_pollInterval);
-        target = _findDevice(fingerprint);
-      }
+    final foreground = await _isMainWindowActive();
+    if (foreground) {
+      // 主页面发送：选择器不要停在屏幕上，扫描阶段由主页面显示。
+      TransferProgressWindow.hide();
     }
 
+    // 已存在的设备：立即尝试发送，同时后台再扫描一次刷新在线状态；
+    // 不再先等扫描完成。
+    var target = _findDevice(fingerprint);
+    if (target != null) {
+      _refreshPresenceInBackground();
+    } else {
+      if (!foreground) {
+        TransferNotification.startPending(
+          sessionId: sessionId,
+          title: t.sendTab.nearbyDevices,
+          text: t.contextMenuPage.searching,
+        );
+      }
+      target = await _waitForDevice(fingerprint);
+    }
     if (target == null) {
       _logger.info('Device $fingerprint was not found in time.');
-      TransferNotification.stop(sessionId);
-      _fallBackToSendPage();
+      // 显示“暂时无法连接”，而不是进入等待响应的会话。
+      TransferNotification.stop(
+        sessionId,
+        outcome: TransferOutcome.failed,
+        text: t.sendPage.connectionLost,
+      );
       return;
     }
 
-    // 主窗口可见时按普通发送打开页面；隐藏时保持后台，只通过通知和设备列表徽标反映状态。
-    final foreground = await _isMainWindowActive();
     if (foreground) {
       TransferNotification.stop(sessionId);
-      _ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+      // 选择器仍然是可见的，主页面发送前先收起。
+      TransferProgressWindow.hide();
     }
     await _ref
         .notifier(sendProvider)
@@ -145,6 +169,29 @@ class QuickSendCoordinator {
           // 避免先 hide 再 show，触发原生窗口尚未结束的隐藏动画而瞬间消失。
           sessionIdOverride: foreground ? null : sessionId,
         );
+  }
+
+  Device? _findDevice(String fingerprint) {
+    final device = _ref.read(nearbyDevicesProvider).allDevices[fingerprint];
+    if (device == null || device.ip == null || device.download) {
+      return null;
+    }
+    return device;
+  }
+
+  /// 后台刷新发现列表；发送不等它。
+  void _refreshPresenceInBackground() {
+    _ref.redux(nearbyDevicesProvider).dispatch(StartMulticastScan());
+    unawaited(
+      _ref.global.dispatchAsync(StartSmartScan()).catchError((Object e) {
+        _logger.info('Background presence scan failed: $e');
+      }),
+    );
+  }
+
+  /// 缓存里的设备不代表现在还在线：移除后重新扫描，找到才算存在。
+  Future<Device?> _waitForDevice(String fingerprint) {
+    return waitForDevicePresence(_ref, fingerprint, timeout: _deviceTimeout);
   }
 
   /// 主窗口是否可见且未最小化（只有 Windows 有原生通知窗口）。
@@ -162,13 +209,102 @@ class QuickSendCoordinator {
     }
   }
 
-  /// 只有当前可直连的设备才算找到：通过信令发现的设备没有 IP。
-  Device? _findDevice(String fingerprint) {
-    final device = _ref.read(nearbyDevicesProvider).allDevices[fingerprint];
-    if (device == null || device.ip == null || device.download) {
-      return null;
+  /// 占位项“没有可发送的设备”触发的流程：
+  /// 加载传入路径 → 扫描（隐藏时显示通知，前台时切到发送页）→ 原生选择器 → 发送。
+  Future<void> scanAndPick(List<String> args) async {
+    _ref.redux(selectedSendingFilesProvider).dispatch(ClearSelectionAction());
+    final filesAdded = await _ref.redux(selectedSendingFilesProvider).dispatchAsyncTakeResult(LoadSelectionFromArgsAction(args));
+    if (!filesAdded) {
+      return;
     }
-    return device;
+    final pickedFiles = List<CrossFile>.of(_ref.read(selectedSendingFilesProvider));
+
+    final foreground = await _isMainWindowActive();
+    if (foreground) {
+      _ref.redux(homePageControllerProvider).dispatch(ChangeTabAction(HomeTab.send));
+    } else {
+      TransferNotification.startPending(
+        sessionId: _scanSessionId,
+        title: t.sendTab.nearbyDevices,
+        text: t.contextMenuPage.scanning,
+      );
+    }
+
+    try {
+      await _ref.global.dispatchAsync(StartSmartScan());
+    } catch (e) {
+      _logger.warning('Scanning for devices failed', e);
+      if (!foreground) {
+        TransferNotification.stop(_scanSessionId);
+      }
+      _showNoDevicesNotice();
+      return;
+    }
+
+    final devices = _pickableDevices();
+    if (devices.isEmpty) {
+      if (!foreground) {
+        TransferNotification.stop(_scanSessionId);
+      }
+      _showNoDevicesNotice();
+      return;
+    }
+    if (!TransferProgressWindow.isSupported) {
+      if (!foreground) {
+        TransferNotification.stop(_scanSessionId);
+      }
+      _fallBackToSendPage();
+      return;
+    }
+
+    final selected = await TransferProgressWindow.showDevicePicker(
+      title: t.sendTab.nearbyDevices,
+      labels: [for (final device in devices) device.alias],
+      infos: [for (final device in devices) _deviceInfo(device)],
+      sendLabel: t.sendTab.title,
+      cancelLabel: t.general.cancel,
+    );
+
+    TransferProgressWindow.hide();
+    if (!foreground) {
+      TransferNotification.clearPending(_scanSessionId);
+    }
+
+    if (selected == null || selected < 0 || selected >= devices.length) {
+      return;
+    }
+
+    await _sendBatch(devices[selected].fingerprint, filesOverride: pickedFiles);
+  }
+
+  List<Device> _pickableDevices() {
+    final favorites = _ref.read(favoritesProvider).map((favorite) => favorite.fingerprint).toSet();
+    final devices = _ref.read(nearbyDevicesProvider).allDevices.values.where((device) => device.ip != null && !device.download).toList();
+    devices.sort((a, b) {
+      final favoriteA = favorites.contains(a.fingerprint);
+      final favoriteB = favorites.contains(b.fingerprint);
+      if (favoriteA != favoriteB) {
+        return favoriteA ? -1 : 1;
+      }
+      final byAlias = a.alias.toLowerCase().compareTo(b.alias.toLowerCase());
+      return byAlias != 0 ? byAlias : a.fingerprint.compareTo(b.fingerprint);
+    });
+    return devices;
+  }
+
+  String _deviceInfo(Device device) {
+    return [
+      if (device.deviceModel != null) device.deviceModel!,
+      device.deviceType.name,
+      if (device.ip != null) device.ip!,
+    ].join(' · ');
+  }
+
+  void _showNoDevicesNotice() {
+    TransferNotification.showNotice(
+      title: t.sendTab.nearbyDevices,
+      text: t.contextMenuPage.noDevicesFound,
+    );
   }
 
   void _fallBackToSendPage() {
@@ -177,7 +313,15 @@ class QuickSendCoordinator {
     Routerino.context.showSnackBar(t.contextMenuPage.deviceUnavailable);
   }
 
+  /// 已有请求等待确认时，隐藏主窗口下只弹通知，不再把主窗口叫出来。
   void _showPendingRequestNotice() {
+    if (!TransferNotification.isMainWindowActive) {
+      TransferNotification.showNotice(
+        title: t.progressPage.titleSending,
+        text: t.contextMenuPage.requestPending,
+      );
+      return;
+    }
     unawaited(showFromTray());
     Routerino.context.showSnackBar(t.contextMenuPage.requestPending);
   }
@@ -203,6 +347,10 @@ class HandleSendArgumentsAction extends AsyncGlobalAction {
 
   @override
   Future<void> reduce() async {
+    if (args.contains('--scan')) {
+      await ref.read(quickSendCoordinatorProvider).scanAndPick(args);
+      return;
+    }
     await ref.read(quickSendCoordinatorProvider).handle(args);
   }
 }

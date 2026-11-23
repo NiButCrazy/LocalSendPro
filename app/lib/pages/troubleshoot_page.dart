@@ -62,6 +62,10 @@ class TroubleshootPage extends StatelessWidget {
             symptomText: t.troubleshootPage.noConnection.symptom,
             solutionText: t.troubleshootPage.noConnection.solution,
           ),
+          _TroubleshootItem(
+            symptomText: t.troubleshootPage.connectionDropped.symptom,
+            solutionText: t.troubleshootPage.connectionDropped.solution,
+          ),
         ],
       ),
     );

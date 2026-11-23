@@ -40,8 +40,9 @@ class TaskbarHelper {
           await updateDockProgress(digestedProgress / digestedTotal);
         }
       } catch (_) {
+        // Best effort: a hidden/minimized window may have no taskbar button,
+        // and the native call then fails. Progress display is cosmetic.
         _lastProgressPercent = null;
-        rethrow;
       }
     } else {
       _lastProgressPercent = null;
@@ -54,7 +55,11 @@ class TaskbarHelper {
   static Future<void> setProgressBarMode(int mode) async {
     _lastProgressPercent = null;
     if (_isWindows) {
-      await WindowsTaskbar.setProgressMode(mode);
+      try {
+        await WindowsTaskbar.setProgressMode(mode);
+      } catch (_) {
+        // Best effort; see setProgressBar.
+      }
     }
   }
 

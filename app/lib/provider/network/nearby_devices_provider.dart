@@ -70,6 +70,25 @@ class ClearFoundDevicesAction extends ReduxAction<NearbyDevicesService, NearbyDe
   }
 }
 
+/// Removes one device that was proven unreachable, so the send tab and the
+/// context menu stop offering it.
+class RemoveDeviceAction extends ReduxAction<NearbyDevicesService, NearbyDevicesState> {
+  final String fingerprint;
+
+  RemoveDeviceAction(this.fingerprint);
+
+  @override
+  NearbyDevicesState reduce() {
+    if (!state.devices.containsKey(fingerprint) && !state.signalingDevices.containsKey(fingerprint)) {
+      return state;
+    }
+    return state.copyWith(
+      devices: {...state.devices}..remove(fingerprint),
+      signalingDevices: {...state.signalingDevices}..remove(fingerprint),
+    );
+  }
+}
+
 /// Registers a device in the state.
 /// It will override any existing device with the same fingerprint: the
 /// incoming device is the merged store state, so it already carries every

@@ -115,7 +115,16 @@ void TransferProgressWindow::SetPinHandler(
   pin_handler_ = std::move(handler);
 }
 
+void TransferProgressWindow::SetPickerHandler(
+    std::function<void(const std::optional<int>&)> handler) {
+  picker_handler_ = std::move(handler);
+}
+
 bool TransferProgressWindow::IsPinActive() const { return mode_ == Mode::pin; }
+
+bool TransferProgressWindow::IsPickerActive() const {
+  return mode_ == Mode::picker;
+}
 
 void TransferProgressWindow::SetTheme(bool dark, int background, int foreground,
                                       int accent) {
@@ -131,18 +140,22 @@ void TransferProgressWindow::SetTheme(bool dark, int background, int foreground,
 }
 
 void TransferProgressWindow::Show(const std::string& title,
-                                  const std::string& text,
-                                  double progress) {
+                                  const std::string& text, double progress,
+                                  bool indeterminate, bool show_bar) {
   if (!EnsureCreated()) {
     return;
   }
+  CancelHideAnimation();
   if (mode_ == Mode::pin) {
     // The caller replaced the PIN prompt with progress; tell Dart the PIN was canceled.
     CancelPin();
   }
+  if (mode_ == Mode::picker) {
+    CancelPicker(false);
+  }
   mode_ = Mode::progress;
   ResizeForMode();
-  SetContent(title, text, progress);
+  SetContent(title, text, progress, indeterminate, show_bar);
   if (!user_positioned_) {
     PositionBottomRight();
   }
@@ -152,27 +165,32 @@ void TransferProgressWindow::Show(const std::string& title,
   if (!was_visible) {
     StartShowAnimation();
   }
+  // SetContent ran before the window became visible; start the indeterminate
+  // marquee (or catch up the determinate bar) now that it is shown.
+  StartProgressAnimation();
   InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 void TransferProgressWindow::Update(const std::string& title,
                                     const std::string& text,
-                                    double progress) {
+                                    double progress, bool show_bar) {
   if (!EnsureCreated()) {
     return;
   }
-  if (mode_ == Mode::pin) {
-    // Progress of other transfers must not overwrite the PIN prompt.
+  CancelHideAnimation();
+  if (mode_ == Mode::pin || mode_ == Mode::picker) {
+    // Progress of other transfers must not overwrite the PIN prompt or the picker.
     return;
   }
   if (mode_ != Mode::progress) {
     mode_ = Mode::progress;
     ResizeForMode();
   }
-  SetContent(title, text, progress);
+  SetContent(title, text, progress, false, show_bar);
   if (!IsWindowVisible(hwnd_)) {
     StartShowAnimation();
   }
+  StartProgressAnimation();
 }
 
 void TransferProgressWindow::ShowWaiting(const std::string& title,
@@ -182,9 +200,13 @@ void TransferProgressWindow::ShowWaiting(const std::string& title,
   if (!EnsureCreated()) {
     return;
   }
+  CancelHideAnimation();
   if (mode_ == Mode::pin) {
     // An incoming request takes the window over; the sending session is canceled.
     CancelPin();
+  }
+  if (mode_ == Mode::picker) {
+    CancelPicker(false);
   }
   mode_ = Mode::waiting;
   accept_label_ = Utf8ToWide(accept_label);
@@ -209,6 +231,11 @@ void TransferProgressWindow::ShowPin(const std::string& title,
                                      const std::string& cancel_label) {
   if (!EnsureCreated()) {
     return;
+  }
+  CancelHideAnimation();
+
+  if (mode_ == Mode::picker) {
+    CancelPicker(false);
   }
 
   const bool already_pin = mode_ == Mode::pin;
@@ -252,10 +279,73 @@ void TransferProgressWindow::ShowPin(const std::string& title,
   InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+void TransferProgressWindow::ShowDevicePicker(
+    const std::string& title, const std::vector<std::string>& labels,
+    const std::vector<std::string>& infos, const std::string& send_label,
+    const std::string& cancel_label) {
+  if (!EnsureCreated()) {
+    return;
+  }
+  CancelHideAnimation();
+
+  if (mode_ == Mode::pin) {
+    CancelPin();
+  }
+  if (mode_ == Mode::picker) {
+    CancelPicker();
+  }
+
+  mode_ = Mode::picker;
+  // The picker needs keyboard focus, so the window must be activatable.
+  const LONG_PTR ex_style = GetWindowLongPtrW(hwnd_, GWL_EXSTYLE);
+  SetWindowLongPtrW(hwnd_, GWL_EXSTYLE,
+                    ex_style & ~static_cast<LONG_PTR>(WS_EX_NOACTIVATE));
+
+  picker_send_label_ = Utf8ToWide(send_label);
+  picker_cancel_label_ = Utf8ToWide(cancel_label);
+  picker_labels_.clear();
+  for (const std::string& label : labels) {
+    picker_labels_.push_back(Utf8ToWide(label));
+  }
+  picker_infos_.clear();
+  for (const std::string& info : infos) {
+    picker_infos_.push_back(Utf8ToWide(info));
+  }
+  picker_selected_ = 0;
+  picker_scroll_ = 0;
+  picker_visible_rows_ = std::clamp<int>(
+      static_cast<int>(picker_labels_.size()), 1, 5);
+  // Title margin, list rows, info line, buttons and margins (logical pixels;
+  // HeightForMode is scaled once by ResizeForMode).
+  picker_height_ = 104 + 26 * picker_visible_rows_;
+
+  SetContent(title, "", 0.0);
+  // SetContent starts the progress bar animation; the picker has no bar.
+  KillTimer(hwnd_, kProgressTimerId);
+  UpdatePickerInfo();
+  ResizeForMode();
+  if (!user_positioned_) {
+    PositionBottomRight();
+  }
+
+  const bool was_visible = IsWindowVisible(hwnd_) != FALSE;
+  SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  if (!was_visible) {
+    StartShowAnimation();
+  }
+  SetForegroundWindow(hwnd_);
+  SetFocus(hwnd_);
+  InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void TransferProgressWindow::Hide() {
   if (mode_ == Mode::pin) {
     // Hiding cancels the prompt, otherwise the Dart future would never complete.
     CancelPin();
+  }
+  if (mode_ == Mode::picker) {
+    CancelPicker();
   }
   if (hwnd_) {
     KillTimer(hwnd_, kProgressTimerId);
@@ -264,16 +354,18 @@ void TransferProgressWindow::Hide() {
 }
 
 void TransferProgressWindow::HideProgressOnly() {
-  if (mode_ == Mode::pin) {
+  if (mode_ == Mode::pin || mode_ == Mode::picker) {
     return;
   }
   Hide();
 }
 
 void TransferProgressWindow::Destroy() {
-  // Shutdown: the Dart side is going away, so never invoke the handler.
+  // Shutdown: the Dart side is going away, so never invoke the handlers.
   pin_handler_ = nullptr;
+  picker_handler_ = nullptr;
   ExitPinMode();
+  ExitPickerMode();
   if (hwnd_) {
     KillTimer(hwnd_, kProgressTimerId);
     HWND window = hwnd_;
@@ -320,7 +412,8 @@ bool TransferProgressWindow::EnsureCreated() {
 
 void TransferProgressWindow::SetContent(const std::string& title,
                                         const std::string& text,
-                                        double progress) {
+                                        double progress, bool indeterminate,
+                                        bool show_bar) {
   title_ = Utf8ToWide(title);
   text_lines_.clear();
   const std::wstring wide_text = Utf8ToWide(text);
@@ -333,6 +426,14 @@ void TransferProgressWindow::SetContent(const std::string& title,
     }
     text_lines_.push_back(wide_text.substr(start, end - start));
     start = end + 1;
+  }
+  // Keep an already running marquee when only the text changes (searching →
+  // waiting), so the animation stays continuous.
+  const bool reuse_marquee = indeterminate && indeterminate_ && IsWindowVisible(hwnd_);
+  indeterminate_ = indeterminate;
+  show_bar_ = show_bar;
+  if (indeterminate_ && !reuse_marquee) {
+    marquee_offset_ = 0.0;
   }
   progress_ = std::clamp(progress, 0.0, 1.0);
   if (progress_ < displayed_progress_) {
@@ -413,6 +514,9 @@ void TransferProgressWindow::RecreateBrushes() {
   if (pin_field_brush_) {
     DeleteObject(pin_field_brush_);
   }
+  if (picker_surface_brush_) {
+    DeleteObject(picker_surface_brush_);
+  }
 
   background_brush_ = CreateSolidBrush(background_color_);
   border_brush_ =
@@ -428,6 +532,8 @@ void TransferProgressWindow::RecreateBrushes() {
       CreateSolidBrush(AdjustColor(accent_color_, -16));
   pin_field_brush_ =
       CreateSolidBrush(dark_ ? RGB(45, 45, 45) : RGB(255, 255, 255));
+  picker_surface_brush_ =
+      CreateSolidBrush(dark_ ? RGB(42, 42, 42) : RGB(250, 250, 250));
 }
 
 void TransferProgressWindow::PositionBottomRight() {
@@ -522,10 +628,28 @@ void TransferProgressWindow::UpdateLayoutMetrics() {
                  pin_edit_rect_.right - pin_edit_rect_.left,
                  pin_edit_rect_.bottom - pin_edit_rect_.top, TRUE);
     }
+  } else if (mode_ == Mode::picker) {
+    const int padding = Scale(16);
+    const int gap = Scale(10);
+    const int button_height = Scale(26);
+    const int button_top = height - Scale(10) - button_height;
+    const int button_width = (width - padding * 2 - gap) / 2;
+    decline_rect_ = {padding, button_top, padding + button_width,
+                     button_top + button_height};
+    accept_rect_ = {padding + button_width + gap, button_top, width - padding,
+                    button_top + button_height};
+    pin_edit_rect_ = {};
+    picker_list_rect_ = {padding, Scale(42), width - padding,
+                         Scale(42) + Scale(26) * picker_visible_rows_};
+    picker_info_rect_ = {padding + Scale(12), picker_list_rect_.bottom + Scale(2),
+                         width - padding,
+                         picker_list_rect_.bottom + Scale(2) + Scale(18)};
   } else {
     accept_rect_ = {};
     decline_rect_ = {};
     pin_edit_rect_ = {};
+    picker_list_rect_ = {};
+    picker_info_rect_ = {};
   }
 }
 
@@ -553,13 +677,19 @@ void TransferProgressWindow::Paint(HDC dc) {
   if (title_font_) {
     SelectObject(memory, title_font_);
   }
-  RECT title_rect = {Scale(16), Scale(10), width - Scale(40), Scale(34)};
+  RECT title_rect = mode_ == Mode::picker
+                        ? RECT{Scale(16), Scale(10), width - Scale(40),
+                               Scale(30)}
+                        : RECT{Scale(16), Scale(10), width - Scale(40),
+                               Scale(34)};
   DrawTextPair(memory, title_, title_rect, true);
 
   if (mode_ == Mode::waiting) {
     PaintWaiting(memory, width, height);
   } else if (mode_ == Mode::pin) {
     PaintPin(memory, width, height);
+  } else if (mode_ == Mode::picker) {
+    PaintPicker(memory, width, height);
   } else {
     PaintProgress(memory, width, height);
   }
@@ -579,20 +709,38 @@ void TransferProgressWindow::PaintProgress(HDC dc, int width, int height) {
   const int track_top = Scale(66);
   const int track_bottom = track_top + Scale(6);
 
-  HGDIOBJ old_pen = SelectObject(dc, GetStockObject(NULL_PEN));
-  HGDIOBJ old_brush = SelectObject(dc, track_brush_);
-  RoundRect(dc, text_left, track_top, text_right, track_bottom, Scale(3),
-            Scale(3));
-
-  const int fill_right =
-      text_left + static_cast<int>((text_right - text_left) * displayed_progress_);
-  if (fill_right > text_left) {
-    SelectObject(dc, fill_brush_);
-    RoundRect(dc, text_left, track_top, fill_right, track_bottom, Scale(3),
+  if (show_bar_) {
+    HGDIOBJ old_pen = SelectObject(dc, GetStockObject(NULL_PEN));
+    HGDIOBJ old_brush = SelectObject(dc, track_brush_);
+    RoundRect(dc, text_left, track_top, text_right, track_bottom, Scale(3),
               Scale(3));
+
+    if (indeterminate_) {
+      // Waiting states have no percentage: move a soft segment along the track.
+      const int track_width = text_right - text_left;
+      const int segment_width = std::max(1, static_cast<int>(track_width * 0.3));
+      const int travel = track_width + segment_width;
+      const int segment_start =
+          text_left + static_cast<int>(travel * marquee_offset_) - segment_width;
+      const int segment_left = std::max(text_left, segment_start);
+      const int segment_right = std::min(text_right, segment_start + segment_width);
+      if (segment_right > segment_left) {
+        SelectObject(dc, fill_brush_);
+        RoundRect(dc, segment_left, track_top, segment_right, track_bottom,
+                  Scale(3), Scale(3));
+      }
+    } else {
+      const int fill_right =
+          text_left + static_cast<int>((text_right - text_left) * displayed_progress_);
+      if (fill_right > text_left) {
+        SelectObject(dc, fill_brush_);
+        RoundRect(dc, text_left, track_top, fill_right, track_bottom, Scale(3),
+                  Scale(3));
+      }
+    }
+    SelectObject(dc, old_brush);
+    SelectObject(dc, old_pen);
   }
-  SelectObject(dc, old_brush);
-  SelectObject(dc, old_pen);
 
   SetTextColor(dc, secondary_color_);
   if (!text_lines_.empty()) {
@@ -606,7 +754,8 @@ void TransferProgressWindow::PaintProgress(HDC dc, int width, int height) {
     if (small_font_) {
       SelectObject(dc, small_font_);
     }
-    RECT line_rect = {text_left, Scale(78), text_right, Scale(98)};
+    const int second_top = show_bar_ ? Scale(80) : Scale(72);
+    RECT line_rect = {text_left, second_top, text_right, second_top + Scale(20)};
     DrawTextPair(dc, text_lines_[1], line_rect, false);
   }
 }
@@ -660,6 +809,96 @@ void TransferProgressWindow::PaintPin(HDC dc, int width, int height) {
 
   PaintButton(dc, decline_rect_, pin_cancel_label_, false, hovered_control_ == 2);
   PaintButton(dc, accept_rect_, pin_confirm_label_, true, hovered_control_ == 1);
+}
+
+void TransferProgressWindow::PaintPicker(HDC dc, int width, int height) {
+  // Rounded surface behind the device rows.
+  HGDIOBJ previous_pen = SelectObject(dc, GetStockObject(NULL_PEN));
+  HGDIOBJ previous_brush = SelectObject(dc, picker_surface_brush_);
+  RoundRect(dc, picker_list_rect_.left, picker_list_rect_.top,
+            picker_list_rect_.right, picker_list_rect_.bottom, Scale(10),
+            Scale(10));
+  SelectObject(dc, GetStockObject(NULL_BRUSH));
+  HPEN border_pen = CreatePen(
+      PS_SOLID, 1, dark_ ? RGB(70, 70, 70) : RGB(226, 226, 226));
+  HGDIOBJ previous_border_pen = SelectObject(dc, border_pen);
+  RoundRect(dc, picker_list_rect_.left, picker_list_rect_.top,
+            picker_list_rect_.right, picker_list_rect_.bottom, Scale(10),
+            Scale(10));
+  SelectObject(dc, previous_border_pen);
+  DeleteObject(border_pen);
+  SelectObject(dc, previous_brush);
+  SelectObject(dc, previous_pen);
+
+  const int row_height = Scale(26);
+  if (text_font_) {
+    SelectObject(dc, text_font_);
+  }
+  for (int row = 0; row < picker_visible_rows_; row++) {
+    const int index = picker_scroll_ + row;
+    if (index < 0 || index >= static_cast<int>(picker_labels_.size())) {
+      break;
+    }
+    RECT row_rect = {picker_list_rect_.left,
+                     picker_list_rect_.top + row * row_height,
+                     picker_list_rect_.right,
+                     picker_list_rect_.top + (row + 1) * row_height};
+
+    if (index == hovered_row_) {
+      SetTextColor(dc, accent_color_);
+    } else {
+      SetTextColor(dc, foreground_color_);
+    }
+    RECT text_rect = row_rect;
+    text_rect.left += Scale(12);
+    text_rect.right -= Scale(24);
+    DrawTextW(dc, picker_labels_[index].c_str(), -1, &text_rect,
+              DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS |
+                  DT_NOPREFIX);
+
+    if (index == picker_selected_) {
+      const int center_x = row_rect.right - Scale(14);
+      const int center_y = (row_rect.top + row_rect.bottom) / 2;
+      const int radius = Scale(3);
+      HGDIOBJ dot_pen = SelectObject(dc, GetStockObject(NULL_PEN));
+      HGDIOBJ dot_brush = SelectObject(dc, fill_brush_);
+      Ellipse(dc, center_x - radius, center_y - radius, center_x + radius,
+              center_y + radius);
+      SelectObject(dc, dot_brush);
+      SelectObject(dc, dot_pen);
+    }
+  }
+
+  const int total = static_cast<int>(picker_labels_.size());
+  if (total > picker_visible_rows_) {
+    const int track_x = picker_list_rect_.right - Scale(4);
+    const int track_top = picker_list_rect_.top + Scale(4);
+    const int track_height = picker_list_rect_.bottom - track_top - Scale(4);
+    const int thumb_height =
+        std::max(Scale(12), track_height * picker_visible_rows_ / total);
+    const int max_scroll = total - picker_visible_rows_;
+    const int thumb_top =
+        track_top + (track_height - thumb_height) * picker_scroll_ / max_scroll;
+    RECT track_rect = {track_x, track_top, track_x + Scale(2),
+                       track_top + track_height};
+    RECT thumb_rect = {track_x - Scale(1), thumb_top, track_x + Scale(3),
+                       thumb_top + thumb_height};
+    FillRect(dc, &track_rect, track_brush_);
+    FillRect(dc, &thumb_rect, button_hover_brush_);
+  }
+
+  if (small_font_) {
+    SelectObject(dc, small_font_);
+  }
+  SetTextColor(dc, secondary_color_);
+  DrawTextW(dc, picker_info_.c_str(), -1, &picker_info_rect_,
+            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX |
+                DT_NOCLIP);
+
+  PaintButton(dc, decline_rect_, picker_cancel_label_, false,
+              hovered_control_ == 2);
+  PaintButton(dc, accept_rect_, picker_send_label_, true,
+              hovered_control_ == 1);
 }
 
 void TransferProgressWindow::DrawTextPair(HDC dc, const std::wstring& line,
@@ -768,7 +1007,8 @@ int TransferProgressWindow::HitTest(POINT point) const {
   if (mouse_inside_ && PtInRect(&close_rect_, point)) {
     return 3;
   }
-  if (mode_ == Mode::waiting || mode_ == Mode::pin) {
+  if (mode_ == Mode::waiting || mode_ == Mode::pin ||
+      mode_ == Mode::picker) {
     if (PtInRect(&accept_rect_, point)) {
       return 1;
     }
@@ -787,6 +1027,13 @@ void TransferProgressWindow::NotifyAction(const char* action) {
 
 void TransferProgressWindow::StartProgressAnimation() {
   if (!hwnd_) {
+    return;
+  }
+  if (indeterminate_) {
+    if (!IsWindowVisible(hwnd_)) {
+      return;
+    }
+    SetTimer(hwnd_, kProgressTimerId, kProgressIntervalMs, nullptr);
     return;
   }
   if (!IsWindowVisible(hwnd_) ||
@@ -909,6 +1156,86 @@ void TransferProgressWindow::ExitPinMode() {
   pin_handler_ = nullptr;
 }
 
+void TransferProgressWindow::UpdatePickerInfo() {
+  if (picker_selected_ < 0 ||
+      picker_selected_ >= static_cast<int>(picker_infos_.size())) {
+    picker_info_.clear();
+    return;
+  }
+  picker_info_ = picker_infos_[static_cast<size_t>(picker_selected_)];
+}
+
+void TransferProgressWindow::MovePickerSelection(int delta) {
+  if (picker_labels_.empty()) {
+    return;
+  }
+  const int last = static_cast<int>(picker_labels_.size()) - 1;
+  picker_selected_ = std::clamp(picker_selected_ + delta, 0, last);
+  if (picker_selected_ < picker_scroll_) {
+    picker_scroll_ = picker_selected_;
+  }
+  if (picker_selected_ >= picker_scroll_ + picker_visible_rows_) {
+    picker_scroll_ = picker_selected_ - picker_visible_rows_ + 1;
+  }
+  UpdatePickerInfo();
+  InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void TransferProgressWindow::SubmitPicker() {
+  if (mode_ != Mode::picker || !picker_handler_ || picker_selected_ < 0 ||
+      picker_selected_ >= static_cast<int>(picker_labels_.size())) {
+    return;
+  }
+
+  const int selected = picker_selected_;
+  // Keep the callback: the runner registers it once and every picker window
+  // needs it. Nulling it made only the first picker's Send button work.
+  auto handler = picker_handler_;
+  ExitPickerMode();
+  if (handler) {
+    handler(std::optional<int>(selected));
+  }
+}
+
+void TransferProgressWindow::CancelPicker(bool hide) {
+  if (mode_ != Mode::picker) {
+    return;
+  }
+
+  auto handler = picker_handler_;
+  ExitPickerMode();
+  if (handler) {
+    // The sender treats an empty answer as "canceled".
+    handler(std::nullopt);
+  }
+  if (hide) {
+    // User canceled: close the card instead of showing an empty progress state.
+    Hide();
+  }
+}
+
+void TransferProgressWindow::ExitPickerMode() {
+  if (hwnd_) {
+    const LONG_PTR ex_style = GetWindowLongPtrW(hwnd_, GWL_EXSTYLE);
+    SetWindowLongPtrW(hwnd_, GWL_EXSTYLE,
+                      ex_style | static_cast<LONG_PTR>(WS_EX_NOACTIVATE));
+    InvalidateRect(hwnd_, nullptr, FALSE);
+  }
+  mode_ = Mode::progress;
+  picker_labels_.clear();
+  picker_infos_.clear();
+  picker_info_.clear();
+  picker_send_label_.clear();
+  picker_cancel_label_.clear();
+  picker_selected_ = 0;
+  picker_scroll_ = 0;
+  picker_visible_rows_ = 1;
+  picker_height_ = 120;
+  hovered_row_ = -1;
+  picker_list_rect_ = {};
+  picker_info_rect_ = {};
+}
+
 void TransferProgressWindow::StartShowAnimation() {
   if (!hwnd_) {
     return;
@@ -980,6 +1307,18 @@ void TransferProgressWindow::StartHideAnimation() {
   SetTimer(hwnd_, kAnimationTimerId, kAnimationIntervalMs, nullptr);
 }
 
+void TransferProgressWindow::CancelHideAnimation() {
+  if (!hwnd_ || !animating_ || !hiding_) {
+    return;
+  }
+  KillTimer(hwnd_, kAnimationTimerId);
+  animating_ = false;
+  hiding_ = false;
+  SetLayeredWindowAttributes(hwnd_, 0, kWindowAlpha, LWA_ALPHA);
+  SetWindowPos(hwnd_, HWND_TOPMOST, animation_base_x_, animation_base_y_, 0,
+               0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
 void TransferProgressWindow::ReleaseResources() {
   if (title_font_) {
     DeleteObject(title_font_);
@@ -1029,6 +1368,10 @@ void TransferProgressWindow::ReleaseResources() {
     DeleteObject(pin_field_brush_);
     pin_field_brush_ = nullptr;
   }
+  if (picker_surface_brush_) {
+    DeleteObject(picker_surface_brush_);
+    picker_surface_brush_ = nullptr;
+  }
 }
 
 int TransferProgressWindow::Scale(int value) const {
@@ -1041,6 +1384,8 @@ int TransferProgressWindow::HeightForMode() const {
       return kWaitingHeight;
     case Mode::pin:
       return kPinHeight;
+    case Mode::picker:
+      return picker_height_;
     case Mode::progress:
       return kProgressHeight;
   }
@@ -1069,8 +1414,41 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
                                                WPARAM wparam, LPARAM lparam) {
   switch (message) {
     case WM_MOUSEACTIVATE:
-      // A PIN prompt needs focus; everything else stays out of the way.
-      return mode_ == Mode::pin ? MA_ACTIVATE : MA_NOACTIVATE;
+      // A PIN prompt or the device picker needs focus; everything else stays out of the way.
+      return (mode_ == Mode::pin || mode_ == Mode::picker) ? MA_ACTIVATE
+                                                           : MA_NOACTIVATE;
+    case WM_KEYDOWN:
+      if (mode_ == Mode::picker) {
+        if (wparam == VK_UP) {
+          MovePickerSelection(-1);
+          return 0;
+        }
+        if (wparam == VK_DOWN) {
+          MovePickerSelection(1);
+          return 0;
+        }
+        if (wparam == VK_RETURN) {
+          SubmitPicker();
+          return 0;
+        }
+        if (wparam == VK_ESCAPE) {
+          CancelPicker();
+          return 0;
+        }
+      }
+      break;
+    case WM_MOUSEWHEEL:
+      if (mode_ == Mode::picker &&
+          picker_labels_.size() > static_cast<size_t>(picker_visible_rows_)) {
+        const int delta = GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_DELTA;
+        const int max_scroll =
+            static_cast<int>(picker_labels_.size()) - picker_visible_rows_;
+        picker_scroll_ =
+            std::clamp(picker_scroll_ - delta, 0, max_scroll);
+        InvalidateRect(window, nullptr, FALSE);
+        return 0;
+      }
+      break;
     case WM_CTLCOLOREDIT: {
       HDC dc = reinterpret_cast<HDC>(wparam);
       if (pin_edit_ && reinterpret_cast<HWND>(lparam) == pin_edit_) {
@@ -1084,6 +1462,14 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
       return 1;
     case WM_TIMER:
       if (wparam == kProgressTimerId) {
+        if (indeterminate_) {
+          marquee_offset_ += 0.015;
+          if (marquee_offset_ > 1.0) {
+            marquee_offset_ -= 1.0;
+          }
+          InvalidateRect(window, nullptr, FALSE);
+          return 0;
+        }
         const double delta = progress_ - displayed_progress_;
         if (std::abs(delta) < 0.005) {
           displayed_progress_ = progress_;
@@ -1159,6 +1545,26 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
         InvalidateRect(window, nullptr, FALSE);
       }
 
+      if (mode_ == Mode::picker) {
+        int row = -1;
+        if (PtInRect(&picker_list_rect_, point)) {
+          const int row_height = Scale(26);
+          if (row_height > 0) {
+            const int index =
+                picker_scroll_ +
+                (point.y - picker_list_rect_.top) / row_height;
+            if (index >= 0 &&
+                index < static_cast<int>(picker_labels_.size())) {
+              row = index;
+            }
+          }
+        }
+        if (row != hovered_row_) {
+          hovered_row_ = row;
+          InvalidateRect(window, nullptr, FALSE);
+        }
+      }
+
       if (pressed_ && !dragging_) {
         const int dx = point.x - press_point_.x;
         const int dy = point.y - press_point_.y;
@@ -1176,26 +1582,51 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
       tracking_mouse_ = false;
       mouse_inside_ = false;
       hovered_control_ = 0;
+      hovered_row_ = -1;
       InvalidateRect(window, nullptr, FALSE);
       return 0;
     case WM_LBUTTONDOWN: {
       UpdateLayoutMetrics();
       POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      if (mode_ == Mode::picker && PtInRect(&picker_list_rect_, point)) {
+        const int row_height = Scale(26);
+        if (row_height > 0) {
+          const int row =
+              picker_scroll_ + (point.y - picker_list_rect_.top) / row_height;
+          if (row >= 0 && row < static_cast<int>(picker_labels_.size())) {
+            picker_selected_ = row;
+            UpdatePickerInfo();
+            InvalidateRect(window, nullptr, FALSE);
+          }
+        }
+        SetFocus(window);
+        return 0;
+      }
       const int hit = HitTest(point);
       if (hit == 3) {
         if (mode_ == Mode::pin) {
           CancelPin();
+        } else if (mode_ == Mode::picker) {
+          CancelPicker();
         } else {
           NotifyAction("hide");
         }
         return 0;
       }
       if (hit == 1) {
-        NotifyAction("accept");
+        if (mode_ == Mode::picker) {
+          SubmitPicker();
+        } else {
+          NotifyAction("accept");
+        }
         return 0;
       }
       if (hit == 2) {
-        NotifyAction("decline");
+        if (mode_ == Mode::picker) {
+          CancelPicker();
+        } else {
+          NotifyAction("decline");
+        }
         return 0;
       }
 
@@ -1214,7 +1645,8 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
 
       UpdateLayoutMetrics();
       POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
-      if (HitTest(point) == 0 && mode_ != Mode::pin) {
+      if (HitTest(point) == 0 && mode_ != Mode::pin &&
+          mode_ != Mode::picker) {
         NotifyAction("open");
       }
       return 0;
@@ -1228,7 +1660,9 @@ LRESULT TransferProgressWindow::MessageHandler(HWND window, UINT message,
       GetCursorPos(&point);
       ScreenToClient(window, &point);
       UpdateLayoutMetrics();
-      if (mouse_inside_ && HitTest(point) != 0) {
+      if (mouse_inside_ &&
+          (HitTest(point) != 0 ||
+           (mode_ == Mode::picker && PtInRect(&picker_list_rect_, point)))) {
         SetCursor(LoadCursorW(nullptr, IDC_HAND));
         return TRUE;
       }

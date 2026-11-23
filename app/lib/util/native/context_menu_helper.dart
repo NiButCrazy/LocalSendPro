@@ -18,9 +18,6 @@ const _backgroundDevicesKey = 'LocalSend.ContextMenuDevicesBackground';
 /// 一次最多写入的设备数量，避免菜单过长。
 const _maxDeviceEntries = 20;
 
-/// `ECF_DISABLED`：让无设备时的占位项不可点击。
-const _ecfDisabled = 0x2;
-
 /// 三个父动词的位置：文件、文件夹、文件夹背景。
 const _verbPaths = <List<String>>[
   ['*', 'shell', _verbKey],
@@ -220,6 +217,12 @@ String buildDeviceCommand({
   return '"$executable" --hidden --send-to "$fingerprint" "$pathToken"';
 }
 
+/// 菜单命令：隐藏启动、扫描并打开设备选择器发送该路径。
+@visibleForTesting
+String buildScanCommand({required String executable, required String pathToken}) {
+  return '"$executable" --hidden --scan "$pathToken"';
+}
+
 bool _writeContextMenu({required bool quickSend}) {
   final executable = Platform.resolvedExecutable;
   final title = _menuTitle();
@@ -405,7 +408,13 @@ void _rewriteDeviceRoot(
       final placeholder = shell.createKey('none');
       try {
         _setStringIfChanged(placeholder, 'MUIVerb', _noDevicesLabel());
-        _setIntIfChanged(placeholder, 'CommandFlags', _ecfDisabled);
+        _setIntIfChanged(placeholder, 'CommandFlags', 0);
+        final command = placeholder.createKey('command');
+        try {
+          _setStringIfChanged(command, '', buildScanCommand(executable: executable, pathToken: pathToken));
+        } finally {
+          command.close();
+        }
       } finally {
         placeholder.close();
       }

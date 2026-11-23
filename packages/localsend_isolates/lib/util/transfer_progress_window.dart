@@ -55,14 +55,27 @@ class TransferProgressWindow {
   static bool get isSupported => defaultTargetPlatform == TargetPlatform.windows;
 
   static void Function(String action)? _actionHandler;
+  static void Function()? _hideHandler;
   static void Function(List<String> args)? _secondInstanceHandler;
 
   /// 正在等待原生 PIN 输入框的结果。
   static Completer<String?>? _pinCompleter;
 
+  /// 正在等待原生设备选择器的结果（选中项下标；null = 取消）。
+  static Completer<int?>? _pickerCompleter;
+
   /// Registers the handler for the native window actions (`accept`, `decline`, `open`, `hide`).
   static void setActionHandler(void Function(String action)? handler) {
     _actionHandler = handler;
+    _syncMethodCallHandler();
+  }
+
+  /// Registers a callback invoked whenever the native close button hides the card.
+  ///
+  /// Kept separate from [setActionHandler] so the receive flow can handle
+  /// accept/decline while pending quick-send states are still cleared on close.
+  static void setHideHandler(void Function()? handler) {
+    _hideHandler = handler;
     _syncMethodCallHandler();
   }
 
@@ -77,7 +90,8 @@ class TransferProgressWindow {
   }
 
   static void _syncMethodCallHandler() {
-    final hasHandler = _actionHandler != null || _secondInstanceHandler != null || _pinCompleter != null;
+    final hasHandler =
+        _actionHandler != null || _hideHandler != null || _secondInstanceHandler != null || _pinCompleter != null || _pickerCompleter != null;
     _channel.setMethodCallHandler(hasHandler ? _handleMethodCall : null);
   }
 
@@ -85,7 +99,14 @@ class TransferProgressWindow {
     if (call.method == 'onWindowAction') {
       final arguments = call.arguments;
       if (arguments is Map && arguments['action'] is String) {
-        _actionHandler?.call(arguments['action'] as String);
+        final action = arguments['action'] as String;
+        if (action == 'hide') {
+          _hideHandler?.call();
+          if (_actionHandler == null) {
+            hide();
+          }
+        }
+        _actionHandler?.call(action);
       }
     } else if (call.method == 'onSecondInstance') {
       final arguments = call.arguments;
@@ -102,8 +123,27 @@ class TransferProgressWindow {
         }
       }
       _completePin(pin);
+    } else if (call.method == 'onDevicePick') {
+      final arguments = call.arguments;
+      int? index;
+      if (arguments is Map) {
+        final value = arguments['index'];
+        if (value is int && value >= 0) {
+          index = value;
+        }
+      }
+      _completePicker(index);
     }
     return null;
+  }
+
+  static void _completePicker(int? index) {
+    final completer = _pickerCompleter;
+    _pickerCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(index);
+    }
+    _syncMethodCallHandler();
   }
 
   static void _completePin(String? pin) {
@@ -152,7 +192,13 @@ class TransferProgressWindow {
     return lastUpdate == null || now().difference(lastUpdate) >= _updateInterval;
   }
 
-  static void show({required String title, required String text, required int percentage}) {
+  static void show({
+    required String title,
+    required String text,
+    required int percentage,
+    bool indeterminate = false,
+    bool showBar = true,
+  }) {
     if (!isSupported) {
       return;
     }
@@ -162,10 +208,19 @@ class TransferProgressWindow {
     _lastTitle = title;
     _lastText = text;
     _lastProgress = percentage;
-    unawaited(_invoke('showProgress', {'title': title, 'text': text, 'progress': percentage / 100, ..._themeArguments()}));
+    unawaited(
+      _invoke('showProgress', {
+        'title': title,
+        'text': text,
+        'progress': percentage / 100,
+        'indeterminate': indeterminate,
+        'bar': showBar,
+        ..._themeArguments(),
+      }),
+    );
   }
 
-  static void update({required String title, required String text, required int percentage}) {
+  static void update({required String title, required String text, required int percentage, bool showBar = true}) {
     if (!isSupported || !_visible) {
       return;
     }
@@ -183,7 +238,15 @@ class TransferProgressWindow {
     _lastTitle = title;
     _lastText = text;
     _lastProgress = percentage;
-    unawaited(_invoke('updateProgress', {'title': title, 'text': text, 'progress': percentage / 100, ..._themeArguments()}));
+    unawaited(
+      _invoke('updateProgress', {
+        'title': title,
+        'text': text,
+        'progress': percentage / 100,
+        'bar': showBar,
+        ..._themeArguments(),
+      }),
+    );
   }
 
   static void hide() {
@@ -191,9 +254,10 @@ class TransferProgressWindow {
       return;
     }
 
-    // Hiding cancels a PIN prompt natively; complete it here as well so the
-    // sender never waits on a window that is gone.
+    // Hiding cancels a PIN prompt and the device picker natively; complete them
+    // here as well so the caller never waits on a window that is gone.
     _completePin(null);
+    _completePicker(null);
     final wasVisible = _visible;
     _visible = false;
     _lastUpdate = null;
@@ -238,6 +302,7 @@ class TransferProgressWindow {
     }
 
     _completePin(null);
+    _completePicker(null);
     final completer = Completer<String?>();
     _pinCompleter = completer;
     _syncMethodCallHandler();
@@ -266,9 +331,55 @@ class TransferProgressWindow {
     return completer.future;
   }
 
+  /// Asks the user to pick one of the discovered devices in the native window.
+  ///
+  /// Returns the selected index or `null` when canceled/hidden. The labels are
+  /// shown in the combo box; [infos] is displayed below it for the selection.
+  static Future<int?> showDevicePicker({
+    required String title,
+    required List<String> labels,
+    required List<String> infos,
+    required String sendLabel,
+    required String cancelLabel,
+  }) {
+    if (!isSupported) {
+      return Future<int?>.value(null);
+    }
+
+    _completePicker(null);
+    _completePin(null);
+    final completer = Completer<int?>();
+    _pickerCompleter = completer;
+    _syncMethodCallHandler();
+
+    _visible = true;
+    _lastUpdate = now();
+    _lastTitle = title;
+    _lastText = null;
+    _lastProgress = null;
+    unawaited(() async {
+      try {
+        await _channel.invokeMethod<void>('showDevicePicker', {
+          'title': title,
+          'text': '',
+          'labels': labels,
+          'infos': infos,
+          'sendLabel': sendLabel,
+          'cancelLabel': cancelLabel,
+          ..._themeArguments(),
+        });
+      } catch (e) {
+        _logger.warning('Could not show the device picker', e);
+        _completePicker(null);
+      }
+    }());
+    return completer.future;
+  }
+
   @visibleForTesting
   static void resetForTest() {
     _completePin(null);
+    _completePicker(null);
     _visible = false;
     _lastUpdate = null;
     _lastTitle = null;

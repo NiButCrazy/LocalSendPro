@@ -120,7 +120,7 @@
       "backgroundModeDescription": "Closing the window keeps LocalSend in the system tray. Device discovery and file receiving continue, while UI rendering is paused and idle memory is returned to the system.",
       "showTrayIcon": "Show tray icon",
       "showTrayIconDescription": "When hidden, closing the window still keeps LocalSend running in the background. Launch LocalSend again to restore the window.",
-      "transferCompletedDuration": "Transfer completion notification",
+      "transferCompletedDuration": "Notification display duration",
       "seconds": "{n} s",
       "transferCompletedDurationOff": "Not shown",
       "launchAtStartup": "Autostart after login",
@@ -197,6 +197,10 @@
     "noConnection": {
       "symptom": "Both devices cannot discover each other nor can they share files.",
       "solution": "Does the problem exist on both sides? If so, you need to make sure that both devices are on the same Wi-Fi network and share the same configuration (port, multicast address, encryption). The Wi-Fi network may not allow communication between participants due to Access Point (AP) Isolation. In this case, this option must be disabled on the router."
+    },
+    "connectionDropped": {
+      "symptom": "Sending fails with \"Temporarily unable to connect\", or the receiver shows that the sender canceled the request.",
+      "solution": "This usually happens while the receiving app is in the background: the system's battery optimization freezes or kills LocalSend, so the connection is reset. Keep LocalSend in the foreground while receiving, disable battery optimization for LocalSend in the system settings, and try again. The same can happen when the screen turns off while a request is waiting for confirmation."
     }
   },
   "networkInterfacesPage": {
@@ -288,6 +292,8 @@
     "rejected": "The recipient has rejected the request.",
     "tooManyAttempts": "@:web.tooManyAttempts",
     "busy": "The recipient is busy with another request.",
+    "noResponse": "The recipient did not respond.",
+    "connectionLost": "Temporarily unable to connect.",
     "pinRequired": "The recipient requires a PIN."
   },
   "contextMenuPage": {
@@ -296,9 +302,11 @@
     "quickSend": "Quick send from the context menu",
     "quickSendDescription": "List nearby devices in the submenu. Clicking a device sends immediately.",
     "searching": "Looking for device…",
+    "scanning": "Looking for nearby devices…",
     "deviceUnavailable": "Device not found. Select a device manually.",
+    "noDevicesFound": "No nearby devices found.",
     "noDevices": "No devices available",
-    "requestPending": "A file request is already waiting for the recipient. Handle it on the phone first."
+    "requestPending": "The recipient is busy with another request."
   },
   "progressPage": {
     "titleSending": "Sending files",

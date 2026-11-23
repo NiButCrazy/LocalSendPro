@@ -57,6 +57,8 @@ void main() {
     final arguments = calls.single.arguments as Map<Object?, Object?>;
     expect(arguments['title'], 'Sending files');
     expect(arguments['progress'], 0.0);
+    expect(arguments['indeterminate'], isFalse);
+    expect(arguments['bar'], isTrue);
   });
 
   test('does not show the window while the app window is visible', () async {
@@ -158,6 +160,7 @@ void main() {
     expect(arguments['text'], contains('100 B / 100 B'));
     expect(arguments['text'], contains('1s left'));
     expect(arguments['progress'], 1.0);
+    expect(arguments['bar'], isTrue);
     expect(calls.map((call) => call.method), isNot(contains('hideProgress')));
 
     await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -223,6 +226,8 @@ void main() {
     expect(arguments['title'], 'My PC');
     expect(arguments['text'], 'Looking for device…');
     expect(arguments['progress'], 0.0);
+    expect(arguments['indeterminate'], isTrue);
+    expect(arguments['bar'], isTrue);
   });
 
   test('does not show the waiting state while the main window is visible', () async {
@@ -288,6 +293,8 @@ void main() {
     expect(arguments['title'], 'Transfer failed');
     expect(arguments['text'], contains('The recipient is busy'));
     expect(arguments['text'], contains('1s left'));
+    expect(arguments['indeterminate'], isFalse);
+    expect(arguments['bar'], isFalse);
     expect(calls.map((call) => call.method), isNot(contains('hideProgress')));
 
     await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -311,6 +318,95 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(calls, isEmpty);
+  });
+
+  test('shows the device picker and returns the selection', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+
+    final future = TransferProgressWindow.showDevicePicker(
+      title: 'Nearby devices',
+      labels: ['A', 'B'],
+      infos: ['Vivo · 192.168.1.2', 'Windows · 192.168.1.3'],
+      sendLabel: 'Send',
+      cancelLabel: 'Cancel',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final call = calls.firstWhere((call) => call.method == 'showDevicePicker');
+    final arguments = call.arguments as Map<Object?, Object?>;
+    expect(arguments['title'], 'Nearby devices');
+    expect(arguments['labels'], ['A', 'B']);
+    expect(arguments['infos'], ['Vivo · 192.168.1.2', 'Windows · 192.168.1.3']);
+
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(const MethodCall('onDevicePick', {'index': 1})),
+      (_) {},
+    );
+
+    expect(await future, 1);
+  });
+
+  test('hiding completes the device picker with null', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+
+    final future = TransferProgressWindow.showDevicePicker(
+      title: 'Nearby devices',
+      labels: ['A'],
+      infos: ['Vivo'],
+      sendLabel: 'Send',
+      cancelLabel: 'Cancel',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    TransferProgressWindow.hide();
+    expect(await future, isNull);
+  });
+
+  test('shows a bar-less notice with countdown', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    TransferNotification.init(
+      const NotificationStrings(
+        titleReceiving: 'Receiving files',
+        titleSending: 'Sending files',
+        titleCompleted: 'Transfer complete',
+        titleFailed: 'Transfer failed',
+        titleCanceled: 'Transfer canceled',
+        completionCountdown: _completionCountdown,
+        remainingTimeMinutes: _remainingMinutes,
+        remainingTimeLong: _remainingLong,
+      ),
+      completionDisplayDuration: const Duration(seconds: 1),
+    );
+
+    TransferNotification.showNotice(title: 'Nearby devices', text: 'No nearby devices found.');
+    await Future<void>.delayed(Duration.zero);
+
+    final shown = calls.firstWhere((call) => call.method == 'showProgress');
+    final arguments = shown.arguments as Map<Object?, Object?>;
+    expect(arguments['title'], 'Nearby devices');
+    expect(arguments['text'], contains('No nearby devices found.'));
+    expect(arguments['text'], contains('1s left'));
+    expect(arguments['bar'], isFalse);
+
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    expect(calls.map((call) => call.method), contains('hideProgress'));
+  });
+
+  test('delivers the native close action to the hide handler', () async {
+    var hidden = 0;
+    TransferProgressWindow.setHideHandler(() => hidden++);
+    addTearDown(() => TransferProgressWindow.setHideHandler(null));
+
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+      channel.name,
+      const StandardMethodCodec().encodeMethodCall(
+        const MethodCall('onWindowAction', {'action': 'hide'}),
+      ),
+      (_) {},
+    );
+
+    expect(hidden, 1);
   });
 
   test('dispatches native window actions', () async {

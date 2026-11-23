@@ -13,10 +13,12 @@ import 'package:localsend_app/pages/send_page.dart';
 import 'package:localsend_app/provider/device_info_provider.dart';
 import 'package:localsend_app/provider/file_transfer_provider.dart';
 import 'package:localsend_app/provider/http_provider.dart';
+import 'package:localsend_app/provider/network/nearby_devices_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/provider/transfer_history_provider.dart';
 import 'package:localsend_app/util/native/pin_prompt.dart';
+import 'package:localsend_app/util/network_error.dart';
 import 'package:localsend_isolates/isolate.dart';
 import 'package:localsend_isolates/model/device.dart';
 import 'package:localsend_isolates/model/dto/file_dto.dart';
@@ -39,6 +41,12 @@ import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
 final _logger = Logger('Send');
+
+/// 把底层连接错误替换成用户能理解的提示，其余错误保留原文。
+String _friendlyTransferError(Object error) {
+  final message = error.humanErrorMessage;
+  return isConnectionError(message) ? t.sendPage.connectionLost : message;
+}
 
 /// This provider manages sending files to other devices.
 ///
@@ -163,6 +171,8 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
 
     if (notifyWhileWaiting) {
       // 主窗口隐藏时显示原生等待窗口；主窗口可见时不弹通知。
+      // 只清掉上一阶段遗留的扫描/选择器等待项，保留其他设备的查找通知。
+      TransferNotification.clearScanPending();
       TransferNotification.startPending(
         sessionId: sessionId,
         title: target.alias,
@@ -371,14 +381,14 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
                 sessionId: sessionId,
                 state: (s) => s?.copyWith(
                   status: SessionStatus.finishedWithErrors,
-                  errorMessage: e.humanErrorMessage,
+                  errorMessage: _friendlyTransferError(e),
                 ),
               );
               _stopWaitingNotification(
                 sessionId,
                 enabled: notifyWhileWaiting,
                 outcome: TransferOutcome.failed,
-                text: e.humanErrorMessage,
+                text: _friendlyTransferError(e),
               );
               return;
           }
@@ -386,18 +396,20 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
           if (_isCanceledBySender(sessionId)) {
             return;
           }
+          final friendlyError = _friendlyTransferError(e);
+          _removeIfUnreachable(target, e);
           state = state.updateSession(
             sessionId: sessionId,
             state: (s) => s?.copyWith(
               status: SessionStatus.finishedWithErrors,
-              errorMessage: e.humanErrorMessage,
+              errorMessage: friendlyError,
             ),
           );
           _stopWaitingNotification(
             sessionId,
             enabled: notifyWhileWaiting,
             outcome: TransferOutcome.failed,
-            text: e.humanErrorMessage,
+            text: friendlyError,
           );
           return;
         }
@@ -435,14 +447,14 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
           sessionId: sessionId,
           state: (s) => s?.copyWith(
             status: SessionStatus.finishedWithErrors,
-            errorMessage: e.humanErrorMessage,
+            errorMessage: _friendlyTransferError(e),
           ),
         );
         _stopWaitingNotification(
           sessionId,
           enabled: notifyWhileWaiting,
           outcome: TransferOutcome.failed,
-          text: e.humanErrorMessage,
+          text: _friendlyTransferError(e),
         );
         return;
       }
@@ -526,6 +538,13 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
   }
 
   /// 快速发送的请求在开始传输前结束时，带上失败原因短暂显示结果，而不是让窗口静默消失。
+  /// 第一次连接失败就从发现列表/右键菜单中清除，避免继续点不可达的缓存设备。
+  void _removeIfUnreachable(Device target, Object error) {
+    if (isConnectionError(error.humanErrorMessage)) {
+      ref.redux(nearbyDevicesProvider).dispatch(RemoveDeviceAction(target.fingerprint));
+    }
+  }
+
   void _stopWaitingNotification(
     String sessionId, {
     required bool enabled,

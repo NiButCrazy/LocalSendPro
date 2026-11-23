@@ -286,6 +286,10 @@ class Translations$troubleshootPage$zh_CN extends Translations$troubleshootPage$
   late final Translations$troubleshootPage$noDiscovery$zh_CN noDiscovery = Translations$troubleshootPage$noDiscovery$zh_CN.internal(_root);
   @override
   late final Translations$troubleshootPage$noConnection$zh_CN noConnection = Translations$troubleshootPage$noConnection$zh_CN.internal(_root);
+  @override
+  late final Translations$troubleshootPage$connectionDropped$zh_CN connectionDropped = Translations$troubleshootPage$connectionDropped$zh_CN.internal(
+    _root,
+  );
 }
 
 // Path: networkInterfacesPage
@@ -466,6 +470,10 @@ class Translations$sendPage$zh_CN extends Translations$sendPage$en {
   @override
   String get busy => '对方正在处理另一个请求。';
   @override
+  String get noResponse => '对方未响应。';
+  @override
+  String get connectionLost => '暂时无法连接。';
+  @override
   String get pinRequired => '接收方启用了 PIN。';
 }
 
@@ -487,11 +495,15 @@ class Translations$contextMenuPage$zh_CN extends Translations$contextMenuPage$en
   @override
   String get searching => '正在查找设备…';
   @override
+  String get scanning => '正在查找附近设备…';
+  @override
   String get deviceUnavailable => '未找到设备，请手动选择设备发送。';
+  @override
+  String get noDevicesFound => '没有找到附近设备。';
   @override
   String get noDevices => '没有可发送的设备';
   @override
-  String get requestPending => '已有一个文件请求正在等待对方确认，请先在手机上处理后再发送。';
+  String get requestPending => '对方正在处理另一个请求。';
 }
 
 // Path: progressPage
@@ -975,7 +987,7 @@ class Translations$sendTab$deviceStatus$zh_CN extends Translations$sendTab$devic
 
   // Translations
   @override
-  String get waiting => '等待确认';
+  String get waiting => '等待确认中';
   @override
   String get sending => '发送中';
 }
@@ -1040,7 +1052,7 @@ class Translations$settingsTab$general$zh_CN extends Translations$settingsTab$ge
   @override
   String get showTrayIconDescription => '隐藏后关闭窗口仍会在后台运行，再次启动 LocalSend 即可恢复窗口。';
   @override
-  String get transferCompletedDuration => '传输完成通知停留时长';
+  String get transferCompletedDuration => '通知停留时长';
   @override
   String seconds({required Object n}) => '${n} 秒';
   @override
@@ -1210,6 +1222,20 @@ class Translations$troubleshootPage$noConnection$zh_CN extends Translations$trou
   String get symptom => '双方设备均无法发现对方或者分享文件。';
   @override
   String get solution => '当问题发生在双方设备上时，请先确认双方设备处于同一个 Wi‑Fi 网络上，且共享相同的网络配置（端口、多播地址、加密选项）。若因 Wi‑Fi 不允许参与者间通信，那么请在路由器中关闭“接入点(AP)隔离”选项。';
+}
+
+// Path: troubleshootPage.connectionDropped
+class Translations$troubleshootPage$connectionDropped$zh_CN extends Translations$troubleshootPage$connectionDropped$en {
+  Translations$troubleshootPage$connectionDropped$zh_CN.internal(TranslationsZhCn root) : this._root = root, super.internal(root);
+
+  final TranslationsZhCn _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get symptom => '发送时提示“暂时无法连接”，或接收方显示“发送者取消了请求”。';
+  @override
+  String get solution =>
+      '这通常发生在接收端应用处于后台时：系统的省电/后台管控策略会冻结或杀掉 LocalSend，导致连接被重置。接收时请保持 LocalSend 在前台，并在系统设置中关闭 LocalSend 的电池优化后再试；等待确认期间息屏也可能触发同样的问题。';
 }
 
 // Path: receiveHistoryPage.segments

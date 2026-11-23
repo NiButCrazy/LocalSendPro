@@ -50,6 +50,7 @@ import 'package:localsend_isolates/util/logger.dart';
 import 'package:localsend_isolates/util/rust_init.dart';
 import 'package:localsend_isolates/util/show_instance.dart';
 import 'package:localsend_isolates/util/transfer_notification.dart';
+import 'package:localsend_isolates/util/transfer_progress_window.dart';
 import 'package:logging/logging.dart';
 import 'package:refena_flutter/addons.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -106,6 +107,7 @@ Future<RefenaContainer> preInit(List<String> args) async {
     notificationStrings,
     completionDisplayDuration: Duration(seconds: persistenceService.getTransferCompletedDuration()),
   );
+  TransferProgressWindow.setHideHandler(TransferNotification.dismissPending);
 
   bool startHidden = false;
   if (checkPlatformIsDesktop()) {

@@ -12,9 +12,8 @@
 //
 // It is a plain Win32 window painted with GDI, deliberately independent of the Flutter
 // window: it must stay visible while the main window is hidden in the tray, and it must not
-// add a second Flutter engine. Three modes exist: a progress bar, a waiting state with
-// accept/decline buttons for incoming requests, and a PIN prompt for outgoing requests that
-// the receiver protects with a PIN.
+// add a second Flutter engine. Modes: progress, waiting for a request, PIN prompt, and a
+// device picker used after a context-menu scan found devices.
 class TransferProgressWindow {
  public:
   explicit TransferProgressWindow(HWND owner);
@@ -23,27 +22,36 @@ class TransferProgressWindow {
   TransferProgressWindow(const TransferProgressWindow&) = delete;
   TransferProgressWindow& operator=(const TransferProgressWindow&) = delete;
 
-  void Show(const std::string& title, const std::string& text, double progress);
-  void Update(const std::string& title, const std::string& text, double progress);
+  void Show(const std::string& title, const std::string& text, double progress,
+            bool indeterminate = false, bool show_bar = true);
+  void Update(const std::string& title, const std::string& text,
+              double progress, bool show_bar = true);
   void ShowWaiting(const std::string& title, const std::string& text,
                    const std::string& accept_label,
                    const std::string& decline_label);
   void ShowPin(const std::string& title, const std::string& text, bool invalid,
                const std::string& confirm_label,
                const std::string& cancel_label);
+  void ShowDevicePicker(const std::string& title,
+                        const std::vector<std::string>& labels,
+                        const std::vector<std::string>& infos,
+                        const std::string& send_label,
+                        const std::string& cancel_label);
   void Hide();
-  // Hides progress and waiting states. A PIN prompt is left alone.
+  // Hides progress and waiting states. A PIN prompt or device picker is left alone.
   void HideProgressOnly();
   void Destroy();
 
   void SetActionHandler(std::function<void(const std::string&)> handler);
   void SetPinHandler(
       std::function<void(const std::optional<std::string>&)> handler);
+  void SetPickerHandler(std::function<void(const std::optional<int>&)> handler);
   bool IsPinActive() const;
+  bool IsPickerActive() const;
   void SetTheme(bool dark, int background, int foreground, int accent);
 
  private:
-  enum class Mode { progress, waiting, pin };
+  enum class Mode { progress, waiting, pin, picker };
 
   static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam,
                                   LPARAM lparam);
@@ -53,7 +61,8 @@ class TransferProgressWindow {
   LRESULT MessageHandler(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
   bool EnsureCreated();
   void SetContent(const std::string& title, const std::string& text,
-                  double progress);
+                  double progress, bool indeterminate = false,
+                  bool show_bar = true);
   void UpdateDpiAndFonts();
   void RecreateBrushes();
   void PositionBottomRight();
@@ -63,6 +72,7 @@ class TransferProgressWindow {
   void PaintProgress(HDC dc, int width, int height);
   void PaintWaiting(HDC dc, int width, int height);
   void PaintPin(HDC dc, int width, int height);
+  void PaintPicker(HDC dc, int width, int height);
   void PaintCloseButton(HDC dc);
   void DrawTextPair(HDC dc, const std::wstring& line, const RECT& rect,
                     bool primary);
@@ -74,8 +84,14 @@ class TransferProgressWindow {
   void SubmitPin();
   void CancelPin();
   void ExitPinMode();
+  void UpdatePickerInfo();
+  void SubmitPicker();
+  void CancelPicker(bool hide = true);
+  void ExitPickerMode();
+  void MovePickerSelection(int delta);
   void StartShowAnimation();
   void StartHideAnimation();
+  void CancelHideAnimation();
   void StartProgressAnimation();
   void ReleaseResources();
   int Scale(int value) const;
@@ -91,8 +107,21 @@ class TransferProgressWindow {
   std::wstring pin_error_;
   std::wstring pin_confirm_label_;
   std::wstring pin_cancel_label_;
+  std::vector<std::wstring> picker_labels_;
+  std::vector<std::wstring> picker_infos_;
+  std::wstring picker_info_;
+  std::wstring picker_send_label_;
+  std::wstring picker_cancel_label_;
+  int picker_selected_ = 0;
+  int picker_scroll_ = 0;
+  int picker_visible_rows_ = 1;
+  int picker_height_ = 120;
+  int hovered_row_ = -1;
   double progress_ = 0.0;
   double displayed_progress_ = 0.0;  // animated toward progress_ for smooth updates
+  bool indeterminate_ = false;       // waiting states animate a marquee segment
+  bool show_bar_ = true;             // result notices hide the bar entirely
+  double marquee_offset_ = 0.0;
   UINT dpi_ = 96;
   bool user_positioned_ = false;
   bool dark_ = false;
@@ -122,8 +151,11 @@ class TransferProgressWindow {
   RECT pin_edit_rect_ = {};
   HWND pin_edit_ = nullptr;
   WNDPROC pin_edit_proc_ = nullptr;
+  RECT picker_list_rect_ = {};
+  RECT picker_info_rect_ = {};
   std::function<void(const std::string&)> action_handler_;
   std::function<void(const std::optional<std::string>&)> pin_handler_;
+  std::function<void(const std::optional<int>&)> picker_handler_;
   HFONT title_font_ = nullptr;
   HFONT text_font_ = nullptr;
   HFONT small_font_ = nullptr;
@@ -136,6 +168,7 @@ class TransferProgressWindow {
   HBRUSH button_hover_brush_ = nullptr;
   HBRUSH primary_button_hover_brush_ = nullptr;
   HBRUSH pin_field_brush_ = nullptr;
+  HBRUSH picker_surface_brush_ = nullptr;
 };
 
 #endif  // RUNNER_TRANSFER_PROGRESS_WINDOW_H_

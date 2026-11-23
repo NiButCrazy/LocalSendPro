@@ -611,6 +611,7 @@ class ReceiveController {
         unawaited(showFromTray());
         return;
       case 'hide':
+        TransferNotification.dismissPending();
         TransferProgressWindow.hide();
         return;
       default:

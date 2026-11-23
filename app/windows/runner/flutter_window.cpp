@@ -67,6 +67,19 @@ bool FlutterWindow::OnCreate() {
             "onPinResult",
             std::make_unique<flutter::EncodableValue>(arguments));
       });
+  transfer_progress_window_->SetPickerHandler(
+      [this](const std::optional<int>& index) {
+        if (!transfer_progress_channel_) {
+          return;
+        }
+        flutter::EncodableMap arguments;
+        arguments[flutter::EncodableValue(std::string("index"))] =
+            index ? flutter::EncodableValue(*index)
+                  : flutter::EncodableValue();
+        transfer_progress_channel_->InvokeMethod(
+            "onDevicePick",
+            std::make_unique<flutter::EncodableValue>(arguments));
+      });
 
   return true;
 }
@@ -211,6 +224,53 @@ void FlutterWindow::HandleTransferProgressCall(
     return;
   }
 
+  if (call.method_name() == "showDevicePicker") {
+    const auto labels_it =
+        arguments->find(flutter::EncodableValue(std::string("labels")));
+    const auto infos_it =
+        arguments->find(flutter::EncodableValue(std::string("infos")));
+    const auto send_it =
+        arguments->find(flutter::EncodableValue(std::string("sendLabel")));
+    const auto cancel_it =
+        arguments->find(flutter::EncodableValue(std::string("cancelLabel")));
+    if (labels_it == arguments->end() || infos_it == arguments->end() ||
+        send_it == arguments->end() || cancel_it == arguments->end()) {
+      result->Error("bad_arguments", "Missing device picker arguments");
+      return;
+    }
+
+    const auto* labels = std::get_if<flutter::EncodableList>(&labels_it->second);
+    const auto* infos = std::get_if<flutter::EncodableList>(&infos_it->second);
+    const auto* send_label = std::get_if<std::string>(&send_it->second);
+    const auto* cancel_label = std::get_if<std::string>(&cancel_it->second);
+    if (!labels || !infos || !send_label || !cancel_label ||
+        labels->size() != infos->size() || labels->empty()) {
+      result->Error("bad_arguments", "Invalid device picker lists");
+      return;
+    }
+
+    std::vector<std::string> label_values;
+    std::vector<std::string> info_values;
+    label_values.reserve(labels->size());
+    info_values.reserve(infos->size());
+    for (size_t i = 0; i < labels->size(); i++) {
+      const auto* label = std::get_if<std::string>(&(*labels)[i]);
+      const auto* info = std::get_if<std::string>(&(*infos)[i]);
+      if (!label || !info) {
+        result->Error("bad_arguments", "Picker entries must be strings");
+        return;
+      }
+      label_values.push_back(*label);
+      info_values.push_back(*info);
+    }
+
+    transfer_progress_window_->ShowDevicePicker(*title, label_values,
+                                                info_values, *send_label,
+                                                *cancel_label);
+    result->Success();
+    return;
+  }
+
   const auto progress_it =
       arguments->find(flutter::EncodableValue(std::string("progress")));
   if (progress_it == arguments->end()) {
@@ -233,9 +293,35 @@ void FlutterWindow::HandleTransferProgressCall(
   }
 
   if (call.method_name() == "showProgress") {
-    transfer_progress_window_->Show(*title, *text, progress);
+    bool indeterminate = false;
+    const auto indeterminate_it =
+        arguments->find(flutter::EncodableValue(std::string("indeterminate")));
+    if (indeterminate_it != arguments->end()) {
+      if (const auto* value =
+              std::get_if<bool>(&indeterminate_it->second)) {
+        indeterminate = *value;
+      }
+    }
+    bool show_bar = true;
+    const auto bar_it =
+        arguments->find(flutter::EncodableValue(std::string("bar")));
+    if (bar_it != arguments->end()) {
+      if (const auto* value = std::get_if<bool>(&bar_it->second)) {
+        show_bar = *value;
+      }
+    }
+    transfer_progress_window_->Show(*title, *text, progress, indeterminate,
+                                    show_bar);
   } else if (call.method_name() == "updateProgress") {
-    transfer_progress_window_->Update(*title, *text, progress);
+    bool show_bar = true;
+    const auto bar_it =
+        arguments->find(flutter::EncodableValue(std::string("bar")));
+    if (bar_it != arguments->end()) {
+      if (const auto* value = std::get_if<bool>(&bar_it->second)) {
+        show_bar = *value;
+      }
+    }
+    transfer_progress_window_->Update(*title, *text, progress, show_bar);
   } else {
     result->NotImplemented();
     return;

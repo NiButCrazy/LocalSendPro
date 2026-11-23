@@ -313,6 +313,9 @@ class Translations$troubleshootPage$en {
   late final Translations$troubleshootPage$firewall$en firewall = Translations$troubleshootPage$firewall$en.internal(_root);
   late final Translations$troubleshootPage$noDiscovery$en noDiscovery = Translations$troubleshootPage$noDiscovery$en.internal(_root);
   late final Translations$troubleshootPage$noConnection$en noConnection = Translations$troubleshootPage$noConnection$en.internal(_root);
+  late final Translations$troubleshootPage$connectionDropped$en connectionDropped = Translations$troubleshootPage$connectionDropped$en.internal(
+    _root,
+  );
 }
 
 // Path: networkInterfacesPage
@@ -533,6 +536,12 @@ class Translations$sendPage$en {
   /// en: 'The recipient is busy with another request.'
   String get busy => 'The recipient is busy with another request.';
 
+  /// en: 'The recipient did not respond.'
+  String get noResponse => 'The recipient did not respond.';
+
+  /// en: 'Temporarily unable to connect.'
+  String get connectionLost => 'Temporarily unable to connect.';
+
   /// en: 'The recipient requires a PIN.'
   String get pinRequired => 'The recipient requires a PIN.';
 }
@@ -560,14 +569,20 @@ class Translations$contextMenuPage$en {
   /// en: 'Looking for device…'
   String get searching => 'Looking for device…';
 
+  /// en: 'Looking for nearby devices…'
+  String get scanning => 'Looking for nearby devices…';
+
   /// en: 'Device not found. Select a device manually.'
   String get deviceUnavailable => 'Device not found. Select a device manually.';
+
+  /// en: 'No nearby devices found.'
+  String get noDevicesFound => 'No nearby devices found.';
 
   /// en: 'No devices available'
   String get noDevices => 'No devices available';
 
-  /// en: 'A file request is already waiting for the recipient. Handle it on the phone first.'
-  String get requestPending => 'A file request is already waiting for the recipient. Handle it on the phone first.';
+  /// en: 'The recipient is busy with another request.'
+  String get requestPending => 'The recipient is busy with another request.';
 }
 
 // Path: progressPage
@@ -1203,8 +1218,8 @@ class Translations$settingsTab$general$en {
   String get showTrayIconDescription =>
       'When hidden, closing the window still keeps LocalSend running in the background. Launch LocalSend again to restore the window.';
 
-  /// en: 'Transfer completion notification'
-  String get transferCompletedDuration => 'Transfer completion notification';
+  /// en: 'Notification display duration'
+  String get transferCompletedDuration => 'Notification display duration';
 
   /// en: '{n} s'
   String seconds({required Object n}) => '${n} s';
@@ -1428,6 +1443,22 @@ class Translations$troubleshootPage$noConnection$en {
   /// en: 'Does the problem exist on both sides? If so, you need to make sure that both devices are on the same Wi-Fi network and share the same configuration (port, multicast address, encryption). The Wi-Fi network may not allow communication between participants due to Access Point (AP) Isolation. In this case, this option must be disabled on the router.'
   String get solution =>
       'Does the problem exist on both sides? If so, you need to make sure that both devices are on the same Wi-Fi network and share the same configuration (port, multicast address, encryption). The Wi-Fi network may not allow communication between participants due to Access Point (AP) Isolation. In this case, this option must be disabled on the router.';
+}
+
+// Path: troubleshootPage.connectionDropped
+class Translations$troubleshootPage$connectionDropped$en {
+  Translations$troubleshootPage$connectionDropped$en.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Sending fails with "Temporarily unable to connect", or the receiver shows that the sender canceled the request.'
+  String get symptom => 'Sending fails with "Temporarily unable to connect", or the receiver shows that the sender canceled the request.';
+
+  /// en: 'This usually happens while the receiving app is in the background: the system's battery optimization freezes or kills LocalSend, so the connection is reset. Keep LocalSend in the foreground while receiving, disable battery optimization for LocalSend in the system settings, and try again. The same can happen when the screen turns off while a request is waiting for confirmation.'
+  String get solution =>
+      'This usually happens while the receiving app is in the background: the system\'s battery optimization freezes or kills LocalSend, so the connection is reset. Keep LocalSend in the foreground while receiving, disable battery optimization for LocalSend in the system settings, and try again. The same can happen when the screen turns off while a request is waiting for confirmation.';
 }
 
 // Path: receiveHistoryPage.segments
