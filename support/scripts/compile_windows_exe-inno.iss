@@ -101,7 +101,7 @@ Source: "{#PayloadDir}\{#MyAppMsixHelper}"; DestDir: "{app}"; Flags: ignoreversi
 Source: "{#PayloadDir}\AppxManifest.xml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\Images\*"; DestDir: "{app}\Images"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PayloadDir}\resources.pri"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#PayloadDir}\resources.scale-*.pri"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PayloadDir}\resources.scale-*.pri"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 #endif
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
@@ -114,7 +114,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 #ifdef LooseRegister
 ; Loose registration needs no signature: register the manifest placed in {app} directly.
 ; Registering loose files requires Developer Mode / sideloading to be enabled.
-Filename: "powershell.exe"; Parameters: "-NoProfile -Command Add-AppxPackage -Register '{app}\AppxManifest.xml'"; Flags: runhidden; Check: DeveloperModeEnabled
+Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""$m = '{app}\AppxManifest.xml'; if (Get-AppxPackage -Name LocalSend.App) {{ exit 0 }; for ($i = 0; $i -lt 2; $i++) {{ try {{ Add-AppxPackage -Register $m -ErrorAction Stop; exit 0 } catch {{ Start-Sleep -Milliseconds 500 } }; $script = 'Add-AppxPackage -Register ' + [char]34 + $m + [char]34 + ' -ErrorAction Stop'; $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script)); $p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList '-NoProfile','-EncodedCommand',$enc; exit $p.ExitCode"""; Flags: runhidden; Check: DeveloperModeEnabled
 #else
 #ifndef SkipMsixHelper
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Add-AppxPackage .\localsend_msix_helper.msix -ExternalLocation $(Get-Location)"; WorkingDir: {app}; Flags: nowait runhidden
