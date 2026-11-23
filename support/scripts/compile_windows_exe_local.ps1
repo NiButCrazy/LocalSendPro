@@ -7,6 +7,27 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Locates a Windows SDK tool through the installed KitsRoot10 (the SDK may live on any drive),
+# falling back to the default location on C:.
+function Find-WindowsSdkFile([string[]]$RelativePaths) {
+    $roots = @()
+    $kitsRoot = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots' -ErrorAction SilentlyContinue).KitsRoot10
+    if ($kitsRoot) {
+        $roots += $kitsRoot
+    }
+    $roots += 'C:\Program Files (x86)\Windows Kits\10\'
+
+    foreach ($root in $roots) {
+        foreach ($relativePath in $RelativePaths) {
+            $match = Get-ChildItem (Join-Path $root $relativePath) -ErrorAction SilentlyContinue | Select-Object -Last 1
+            if ($match) {
+                return $match.FullName
+            }
+        }
+    }
+    throw "Windows SDK tool not found: $($RelativePaths -join ', ') (KitsRoot10: $kitsRoot)"
+}
+
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $payload = Join-Path $env:TEMP 'localsend-inno'
 $result = Join-Path $root 'app\build\windows\x64\installer'
@@ -15,10 +36,10 @@ $helper = Join-Path $root 'app\windows\localsend_msix_helper.msix'
 
 # CMake installs this file next to the exe, so it must exist before `flutter build windows`.
 if (-not (Test-Path $helper)) {
-    $makepri = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\makepri.exe' | Select-Object -Last 1
-    $makeappx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\makeappx.exe' | Select-Object -Last 1
-    & $makepri.FullName new /pr $content /cf (Join-Path $root 'support\build\msix\priconfig.xml') /mn (Join-Path $content 'AppxManifest.xml') /of (Join-Path $content 'resources.pri') /o
-    & $makeappx.FullName pack /o /d $content /nv /p $helper
+    $makepri = Find-WindowsSdkFile @('bin\10.*\x64\makepri.exe')
+    $makeappx = Find-WindowsSdkFile @('bin\10.*\x64\makeappx.exe', 'App Certification Kit\makeappx.exe')
+    & $makepri new /pr $content /cf (Join-Path $root 'support\build\msix\priconfig.xml') /mn (Join-Path $content 'AppxManifest.xml') /of (Join-Path $content 'resources.pri') /o
+    & $makeappx pack /o /d $content /nv /p $helper
 }
 
 Push-Location (Join-Path $root 'app')
@@ -65,6 +86,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $target = Join-Path $result "LocalSend-$Version-windows-x86-64.exe"
+Remove-Item $target -Force -ErrorAction SilentlyContinue
 Move-Item (Join-Path $result 'localsend.exe') $target -Force
 
 Write-Output "Installer: $target"
