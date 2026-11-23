@@ -386,22 +386,26 @@ void _rewriteDeviceRoot(
   required String executable,
   required String pathToken,
 }) {
-  final root = _createKeyPath(classes, [rootKey]);
-  try {
-    root.deleteKey('shell', recursive: true);
-  } catch (_) {
-    // 子键可能尚不存在。
-  } finally {
-    root.close();
-  }
-
   final shell = _createKeyPath(classes, [rootKey, 'shell']);
   try {
+    final desiredNames = entries.isEmpty ? {'none'} : {for (var i = 0; i < entries.length; i++) 'd$i'};
+    // Enumerate before deleting; the generator reads the key live.
+    for (final name in shell.subkeyNames.toList(growable: false)) {
+      if (desiredNames.contains(name)) {
+        continue;
+      }
+      try {
+        shell.deleteKey(name, recursive: true);
+      } catch (_) {
+        // Ignore keys that disappeared in the meantime.
+      }
+    }
+
     if (entries.isEmpty) {
       final placeholder = shell.createKey('none');
       try {
-        placeholder.createValue(RegistryValue.string('MUIVerb', _noDevicesLabel()));
-        placeholder.createValue(RegistryValue.int32('CommandFlags', _ecfDisabled));
+        _setStringIfChanged(placeholder, 'MUIVerb', _noDevicesLabel());
+        _setIntIfChanged(placeholder, 'CommandFlags', _ecfDisabled);
       } finally {
         placeholder.close();
       }
@@ -413,17 +417,19 @@ void _rewriteDeviceRoot(
       final keyName = 'd$i';
       final verb = shell.createKey(keyName);
       try {
-        verb.createValue(RegistryValue.string('MUIVerb', entry.displayAlias));
-        verb.createValue(RegistryValue.string('MultiSelectModel', 'Player'));
-        verb.createValue(RegistryValue.int32('CommandFlags', 0));
+        _setStringIfChanged(verb, 'MUIVerb', entry.displayAlias);
+        _setStringIfChanged(verb, 'MultiSelectModel', 'Player');
+        _setIntIfChanged(verb, 'CommandFlags', 0);
       } finally {
         verb.close();
       }
 
       final command = _createKeyPath(classes, [rootKey, 'shell', keyName, 'command']);
       try {
-        command.createValue(
-          RegistryValue.string('', buildDeviceCommand(executable: executable, fingerprint: entry.fingerprint, pathToken: pathToken)),
+        _setStringIfChanged(
+          command,
+          '',
+          buildDeviceCommand(executable: executable, fingerprint: entry.fingerprint, pathToken: pathToken),
         );
       } finally {
         command.close();
@@ -432,6 +438,21 @@ void _rewriteDeviceRoot(
   } finally {
     shell.close();
   }
+}
+
+/// Updates a value only when it differs, keeping in-place syncs cheap.
+void _setStringIfChanged(RegistryKey key, String name, String value) {
+  if (key.getStringValue(name) == value) {
+    return;
+  }
+  key.createValue(RegistryValue.string(name, value));
+}
+
+void _setIntIfChanged(RegistryKey key, String name, int value) {
+  if (key.getIntValue(name) == value) {
+    return;
+  }
+  key.createValue(RegistryValue.int32(name, value));
 }
 
 bool _deleteContextMenu() {
